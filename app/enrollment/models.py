@@ -1,43 +1,60 @@
-from app import db
 from enum import Enum
 from datetime import datetime
-import uuid
+import uuid as uuid_tool
+from app import db
 
 
 class BatchStatus(Enum):
     PROCESSING = "processing"
+    EXTRACTING = "extracting"
     DONE = "done"
     PARTIAL = "partial"
     FAILED = "failed"
-    REVIEWED = "reviewed"  # if all forms in batch has been reviewed
+    REVIEWED = "reviewed"
 
 
 class FormStatus(Enum):
-    PENDING = "pending"  # not reviewed
-    ENROLLED = "enrolled"  # successful enrolled
-    FAILED = "failed"  # error from his when enrolling
-    REJECTED = "rejected"  # user reject form while reviewing
+    PENDING = "pending"
+    READY = "ready"
+    ENROLLED = "enrolled"  # Successfully pushed to the remote HIS pipeline
+    FAILED = "failed"  # Error returned from the network API when enrolling
+    REJECTED = "rejected"  # Explicitly marked bad by human validator
     NEED_RESCAN = "need_rescan"
-    ERROR = "error"
+    ERROR = "error"  # Local extraction or processing pipeline error
 
 
 class Batch(db.Model):
     __tablename__ = "batches"
     id = db.Column(db.Integer, primary_key=True)
-    uuid = db.Column(db.String, unique=True, default=lambda: str(uuid.uuid4()))
+    uuid = db.Column(db.String, unique=True, default=lambda: str(uuid_tool.uuid4()))
     total = db.Column(db.Integer, default=0)
     status = db.Column(db.Enum(BatchStatus), default=BatchStatus.PROCESSING)
-    processed = db.Column(db.Integer, default=0)
     lga_no = db.Column(db.Integer, nullable=True)
     ward_no = db.Column(db.Integer, nullable=True)
     facility_no = db.Column(db.Integer, nullable=True)
-    submitted_at = db.Column(db.DateTime, default=datetime.now)
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     zip_hash = db.Column(db.Text, nullable=True, unique=True)
-    forms = db.relationship("Form", backref="batch")
+    forms = db.relationship("Form", backref="batch", lazy=True)
+
+    def to_dict(self):
+        return {
+            "id": self.uuid,
+            "total": self.total,
+            "status": self.status.value,
+            "processed": self.processed,
+            "reviewed": self.reviewed,
+            "lga_no": self.lga_no,
+            "ward_no": self.ward_no,
+            "facility_no": self.facility_no,
+            "submitted_at": (
+                self.submitted_at.isoformat() if self.submitted_at else None
+            ),
+        }
 
 
 class Form(db.Model):
     __tablename__ = "forms"
+
     UPDATABLE_FIELDS = {
         "title",
         "surname",
@@ -65,41 +82,85 @@ class Form(db.Model):
         "facility_no",
     }
 
-    sequence = db.Column(db.Integer)
     id = db.Column(db.Integer, primary_key=True)
-    uuid = db.Column(db.String, default=lambda: str(uuid.uuid4()))
+    sequence = db.Column(db.Integer)
+    uuid = db.Column(db.String, unique=True, default=lambda: str(uuid_tool.uuid4()))
     img_path = db.Column(db.Text, nullable=False)
-    passport_path = db.Column(db.Text)
-    nin = db.Column(db.String(12))
-    surname = db.Column(db.String)
-    firstname = db.Column(db.String)
-    othername = db.Column(db.String)
-    dob = db.Column(db.String)
-    address = db.Column(db.Text)
-    gender = db.Column(db.String(6))
-    phone_number = db.Column(db.String)
-    settlement = db.Column(db.String(5))
-    category = db.Column(db.String)
-    marital_status = db.Column(db.String)
-    batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"))
+    passport_path = db.Column(db.Text, nullable=True)
+    nin = db.Column(db.String(12), nullable=True)
+    surname = db.Column(db.String, nullable=True)
+    firstname = db.Column(db.String, nullable=True)
+    othername = db.Column(db.String, nullable=True)
+    dob = db.Column(db.String, nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    gender = db.Column(db.String(6), nullable=True)
+    phone_number = db.Column(db.String, nullable=True)
+    settlement = db.Column(db.String(5), nullable=True)
+    category = db.Column(db.String, nullable=True)
+    marital_status = db.Column(db.String, nullable=True)
 
-    kin_firstname = db.Column(db.String)
-    kin_othername = db.Column(db.String)
-    kin_surname = db.Column(db.String)
-    kin_relationship = db.Column(db.String)
-    kin_phone_number = db.Column(db.String)
-    kin_address = db.Column(db.String)
-    lga_no = db.Column(db.Integer, nullable=False)
-    ward_no = db.Column(db.Integer, nullable=False)
-    facility_no = db.Column(db.Integer, nullable=False)
+    batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False)
+
+    kin_firstname = db.Column(db.String, nullable=True)
+    kin_othername = db.Column(db.String, nullable=True)
+    kin_surname = db.Column(db.String, nullable=True)
+    kin_relationship = db.Column(db.String, nullable=True)
+    kin_phone_number = db.Column(db.String, nullable=True)
+    kin_address = db.Column(db.String, nullable=True)
+
+    lga_no = db.Column(db.Integer, nullable=True)
+    ward_no = db.Column(db.Integer, nullable=True)
+    facility_no = db.Column(db.Integer, nullable=True)
 
     status = db.Column(db.Enum(FormStatus), default=FormStatus.PENDING)
-    reason = db.Column(db.String)
-    title = db.Column(db.String)
-    error_message = db.Column(db.String)
-    enrolled_at = db.Column(db.DateTime, default=None)
+    reason = db.Column(db.String, nullable=True)
+    title = db.Column(db.String, nullable=True)
+    error_message = db.Column(db.String, nullable=True)
+    enrolled_at = db.Column(db.DateTime, default=None, nullable=True)
 
     passport_xmin = db.Column(db.Integer, nullable=True)
     passport_ymin = db.Column(db.Integer, nullable=True)
     passport_xmax = db.Column(db.Integer, nullable=True)
     passport_ymax = db.Column(db.Integer, nullable=True)
+
+    def to_dict(self):
+        return {
+            "uuid": self.uuid,
+            "sequence": self.sequence,
+            "status": self.status.value,
+            "img_path": self.img_path,
+            "passport_path": self.passport_path,
+            "reason": self.reason,
+            "error_message": self.error_message,
+            "fields": {
+                "title": self.title,
+                "surname": self.surname,
+                "firstname": self.firstname,
+                "othername": self.othername,
+                "dob": self.dob,
+                "gender": self.gender,
+                "phone_number": self.phone_number,
+                "nin": self.nin,
+                "address": self.address,
+                "category": self.category,
+                "marital_status": self.marital_status,
+                "settlement": self.settlement,
+                "lga_no": self.lga_no,
+                "ward_no": self.ward_no,
+                "facility_no": self.facility_no,
+            },
+            "next_of_kin": {
+                "firstname": self.kin_firstname,
+                "surname": self.kin_surname,
+                "othername": self.kin_othername,
+                "relationship": self.kin_relationship,
+                "phone_number": self.kin_phone_number,
+                "address": self.kin_address,
+            },
+            "crop_coords": {
+                "xmin": self.passport_xmin,
+                "ymin": self.passport_ymin,
+                "xmax": self.passport_xmax,
+                "ymax": self.passport_ymax,
+            },
+        }
