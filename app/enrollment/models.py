@@ -33,6 +33,8 @@ class Batch(db.Model):
     ward_no = db.Column(db.Integer, nullable=True)
     facility_no = db.Column(db.Integer, nullable=True)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    state_code = db.Column(db.Integer, nullable=True)
+    plan_id = db.Column(db.Integer, nullable=True)
     zip_hash = db.Column(db.Text, nullable=True, unique=True)
     forms = db.relationship("Form", backref="batch", lazy=True)
 
@@ -96,10 +98,22 @@ class Form(db.Model):
     gender = db.Column(db.String(6), nullable=True)
     phone_number = db.Column(db.String, nullable=True)
     settlement = db.Column(db.String(5), nullable=True)
-    category = db.Column(db.String, nullable=True)
-    marital_status = db.Column(db.String, nullable=True)
+    category = db.Column(db.Integer, nullable=True)
+    marital_status = db.Column(db.Integer, nullable=True)
 
     batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False)
+    # enrollee_number is returned from the HIS, useful if we add ID card generation
+    enrollee_number = db.Column(db.String, nullable=True)
+
+    # Sickle cell people are treated seperately, later we would add a way to identify them.
+    # The HIS Site doesn't disaggregrate, but it allows a medical history list, we can pass sickle cell
+    # also it allows genotype, we can send ss.
+    # Hiv people are also treated specially, called (PLHIV - People living with HIV)
+    # The HIS site does not treat it seperated, currently, after enrolling the data. 
+    # The staff retype hiv people details in a seperate google sheet
+    # But again the HIS allows a medical history coluwn, we can add hiv to this, and avoid seperate storing
+    # when we pull the data from the HIS, we filter by  medical history.
+    # None of the genotype, medical are mandatory to fill by the HIS
 
     kin_firstname = db.Column(db.String, nullable=True)
     kin_othername = db.Column(db.String, nullable=True)
@@ -107,12 +121,12 @@ class Form(db.Model):
     kin_relationship = db.Column(db.String, nullable=True)
     kin_phone_number = db.Column(db.String, nullable=True)
     kin_address = db.Column(db.String, nullable=True)
-
     lga_no = db.Column(db.Integer, nullable=True)
     ward_no = db.Column(db.Integer, nullable=True)
     facility_no = db.Column(db.Integer, nullable=True)
-
+    occupation = db.Column(db.String, nullable=True)
     status = db.Column(db.Enum(FormStatus), default=FormStatus.PENDING)
+    flagged = db.Column(db.Boolean, default=False, nullable=True)
     reason = db.Column(db.String, nullable=True)
     title = db.Column(db.String, nullable=True)
     error_message = db.Column(db.String, nullable=True)
