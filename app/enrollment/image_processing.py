@@ -1,7 +1,7 @@
 import cv2
 import pytesseract
 import re
-from deepface import DeepFace
+
 
 def read_image(image_path_or_matrix):
     if isinstance(image_path_or_matrix, str):
@@ -16,6 +16,8 @@ def read_image(image_path_or_matrix):
 
 def downscale_image(img, target_width=1000):
     h_img, w_img = img.shape[:2]
+    if w_img <= target_width:
+        return img, 1.0
     scale_factor = target_width / w_img
     target_height = int(h_img * scale_factor)
     img_low_res = cv2.resize(
@@ -26,12 +28,11 @@ def downscale_image(img, target_width=1000):
 
 def is_image_too_blurry(image_path_or_matrix, threshold=200.0, logger=None):
     img = read_image(image_path_or_matrix)
+    img, _ = downscale_image(img)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
     if logger:
-        logger.info(
-            f"Image Sharpness Score (Laplacian Variancce):  {laplacian_var:2f}"
-        )
+        logger.info(f"Image Sharpness Score (Laplacian Variance):  {laplacian_var:2f}")
     if laplacian_var < threshold:
         return True
 
@@ -59,6 +60,8 @@ def correct_form_orentation(img_path_or_matrix, logger=None):
 
 
 def extract_full_passport_with_backend(img_path_or_matrix, margin=0.27, logger=None):
+    from deepface import DeepFace
+
     img = read_image(img_path_or_matrix)
     h_img, w_img = img.shape[:2]
     img_low_res, scale_factor = downscale_image(img)
@@ -75,7 +78,7 @@ def extract_full_passport_with_backend(img_path_or_matrix, margin=0.27, logger=N
             face = DeepFace.extract_faces(img_low_res)
         except Exception as e:
             # if we reach here, then probably the form has no passport
-            return {'x1': -1, 'x2': -1, 'y1': -1, 'y2': -1}
+            return {"x1": -1, "x2": -1, "y1": -1, "y2": -1}
 
     face_area = face[0]["facial_area"]
     x, y, w, h = (
@@ -92,3 +95,4 @@ def extract_full_passport_with_backend(img_path_or_matrix, margin=0.27, logger=N
     x2 = min(w_img, x + w + pad_w)
     y2 = min(h_img, y + h + int(pad_h * 1.0))
     return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
+

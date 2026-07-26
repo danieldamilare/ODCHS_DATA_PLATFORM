@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from werkzeug.datastructures import FileStorage
+from app.enrollment.utils import validate_zip_file
 
 
 class MaritalStatusEnum(str, Enum):
@@ -35,3 +37,17 @@ class OCRResponse(BaseModel):
     phone_number: str = ""
     nin: str = ""
     next_of_kin: Optional[NextOfKin] = None
+
+
+class BatchUploader(BaseModel):
+    batch_file: FileStorage
+    lga_no: Optional[int] = None
+    ward_no: Optional[int] = None
+    facility_no: Optional[int] = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("batch_file")
+    @classmethod
+    def validate_file(cls, file: FileStorage):
+        return validate_zip_file(file)
