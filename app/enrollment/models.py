@@ -2,15 +2,14 @@ from enum import Enum
 from datetime import datetime
 import uuid as uuid_tool
 from app import db
+from app import kv
 
 
 class BatchStatus(Enum):
     PROCESSING = "processing"
-    EXTRACTING = "extracting"
     DONE = "done"
     PARTIAL = "partial"
     FAILED = "failed"
-    REVIEWED = "reviewed"
 
 
 class FormStatus(Enum):
@@ -43,8 +42,8 @@ class Batch(db.Model):
             "id": self.uuid,
             "total": self.total,
             "status": self.status.value,
-            "processed": self.processed,
-            "reviewed": self.reviewed,
+            "plan": "BHCPFP",
+            "state": "Ondo State",
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
@@ -104,12 +103,14 @@ class Form(db.Model):
     batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False)
     # enrollee_number is returned from the HIS, useful if we add ID card generation
     enrollee_number = db.Column(db.String, nullable=True)
+    genotype = db.Column(db.String(3), nullable=True)
+    medical_history = db.Column(db.Text, nullable=True)
 
     # Sickle cell people are treated seperately, later we would add a way to identify them.
     # The HIS Site doesn't disaggregrate, but it allows a medical history list, we can pass sickle cell
     # also it allows genotype, we can send ss.
     # Hiv people are also treated specially, called (PLHIV - People living with HIV)
-    # The HIS site does not treat it seperated, currently, after enrolling the data. 
+    # The HIS site does not treat it seperated, currently, after enrolling the data.
     # The staff retype hiv people details in a seperate google sheet
     # But again the HIS allows a medical history coluwn, we can add hiv to this, and avoid seperate storing
     # when we pull the data from the HIS, we filter by  medical history.
@@ -139,7 +140,7 @@ class Form(db.Model):
 
     def to_dict(self):
         return {
-            "uuid": self.uuid,
+            "id": self.uuid,
             "sequence": self.sequence,
             "status": self.status.value,
             "img_path": self.img_path,

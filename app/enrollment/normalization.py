@@ -8,6 +8,7 @@ from app.enrollment.schema import OCRResponse
 import base64
 import re
 
+
 def normalize_ng_phone(raw: str) -> Optional[str]:
     if not raw:
         return None
@@ -18,6 +19,7 @@ def normalize_ng_phone(raw: str) -> Optional[str]:
         return f"+234{digits[1:]}"
     return None  # unrecognized format
 
+
 def compute_age(dob) -> int:
     if isinstance(dob, str):
         dob = parser.parse(dob, dayfirst=False).date()
@@ -26,10 +28,11 @@ def compute_age(dob) -> int:
     today = datetime.today().date()
     return relativedelta.relativedelta(today, dob).years
 
+
 def process_category(dob, gender: str, marital_status: str) -> str:
     age = compute_age(dob)
-    is_female = (gender or '').strip().lower().startswith('f')
-    marital_status = (marital_status or '').strip().lower()
+    is_female = (gender or "").strip().lower().startswith("f")
+    marital_status = (marital_status or "").strip().lower()
     if age <= 5:
         return "CHILDREN UNDER 5 YEARS"
     if age >= 65:
@@ -42,12 +45,14 @@ def process_category(dob, gender: str, marital_status: str) -> str:
 
 
 def process_title(gender: str, marital_status: str) -> str:
-    if (gender or '').strip().lower().startswith('m'):
+    if (gender or "").strip().lower().startswith("m"):
         return "Mr."
-    return "Miss" if (marital_status or '').strip().lower() == "single" else "Mrs."
+    return "Miss" if (marital_status or "").strip().lower() == "single" else "Mrs."
 
 
-def normalize_form_object(form: Form, batch: Batch, res: OCRResponse, coords:Dict) -> Form:
+def normalize_form_object(
+    form: Form, batch: Batch, res: OCRResponse, coords: Dict
+) -> Form:
 
     flagged_reasons = []
 
@@ -71,7 +76,9 @@ def normalize_form_object(form: Form, batch: Batch, res: OCRResponse, coords:Dic
     form.kin_phone_number = normalize_ng_phone(res.next_of_kin.phone_number)
     form.kin_surname = res.next_of_kin.surname
 
-    title = process_title(form.gender, res.marital_status.value if res.marital_status else '')
+    title = process_title(
+        form.gender, res.marital_status.value if res.marital_status else ""
+    )
     form.title = title
 
     loader = get_loader()
@@ -85,37 +92,37 @@ def normalize_form_object(form: Form, batch: Batch, res: OCRResponse, coords:Dic
 
     category = None
     if dob:
-        category = process_category(dob, form.gender, res.marital_status.value if res.marital_status else '')
+        category = process_category(
+            dob, form.gender, res.marital_status.value if res.marital_status else ""
+        )
         form.category = loader.citizen_types.get(category, None)
     else:
         flagged_reasons.append("No date of birth provided cannot determine category")
 
     if res.marital_status:
-        form.marital_status = loader.marital_status.get(res.marital_status.value, None)
-
+        form.marital_status = res.marital_status
 
     address = form.address
     kin_address = form.kin_address
-
 
     if not address:
         form.address = kin_address
     if not kin_address:
         form.kin_address = address
-    
+
     if not kin_address and not address and form.ward_no:
-         address = loader.reverse_ward.get(form.ward_no, '')
-         form.address = address
-         form.kin_address = address
+        address = loader.reverse_ward.get(str(form.ward_no), "")
+        form.address = address
+        form.kin_address = address
 
     if not form.kin_relationship:
-        form.kin_relationship = 'family'
+        form.kin_relationship = "family"
 
     if form.lga_no:
-        lga = loader.reverse_lga.get(form.lga_no)
+        lga = loader.reverse_lga.get(str(form.lga_no))
         if lga:
-            form.settlement = 'Urban' if 'akure' in lga.strip().lower() else 'Rural'
-            
+            form.settlement = "Urban" if "akure" in lga.strip().lower() else "Rural"
+
     if not form.nin:
         flagged_reasons.append("No nin provided")
     elif len(form.nin) != 11:
@@ -124,31 +131,31 @@ def normalize_form_object(form: Form, batch: Batch, res: OCRResponse, coords:Dic
     phone_number = form.phone_number
     kin_phone_number = form.kin_phone_number
     if not phone_number and not kin_phone_number:
-        flagged_reasons.append("No Traceability. Next of kin phone number and enrollee phone number not provided")
+        flagged_reasons.append(
+            "No Traceability. Next of kin phone number and enrollee phone number not provided"
+        )
     else:
         if not phone_number:
             form.phone_number = kin_phone_number
         elif not kin_phone_number:
             form.kin_phone_number = phone_number
 
-    if coords['x1'] < 0:
+    if coords["x1"] < 0:
         flagged_reasons.append("No passport provided")
     else:
-        form.passport_xmin = coords['x1']
-        form.passport_ymin = coords['y1']
-        form.passport_xmax = coords['x2']
-        form.passport_ymax = coords['y2']
+        form.passport_xmin = coords["x1"]
+        form.passport_ymin = coords["y1"]
+        form.passport_xmax = coords["x2"]
+        form.passport_ymax = coords["y2"]
 
     if category and not form.category:
         flagged_reasons.append(f"Unrecognized category: {category}")
-    if res.marital_status and not form.marital_status:
-        flagged_reasons.append(f"Unrecognized marital status: {res.marital_status.value}")
 
     if not form.gender:
         flagged_reasons.append("Unknown Gender")
 
-    if  flagged_reasons:
+    if flagged_reasons:
         form.flagged = True
-        form.reason = ';'.join(flagged_reasons)
+        form.reason = ";".join(flagged_reasons)
 
     return form
