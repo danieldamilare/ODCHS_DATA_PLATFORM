@@ -17,13 +17,15 @@ class LLMExtractionFailed(Exception):
 MODEL_NAME = "gemini-3.5-flash"
 
 
-def gemini_client(image_path: str, logger=None, max_retries=4) -> Dict:
+def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
+    print("Gemini recieved image path: ", image_path)
     last_error = None
-    current_api_key = get_key()
-    if current_api_key is None:
-        raise AllKeysExhausted()
 
     for attempt in range(max_retries + 1):
+        current_api_key = get_key()
+        print("Gemini successfully acquired key: ", current_api_key)
+        if current_api_key is None:
+            raise AllKeysExhausted()
         try:
             client = genai.Client(api_key=current_api_key)
             uploaded_file = client.files.upload(file=image_path)
@@ -44,9 +46,11 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> Dict:
                     },
                 ],
             )
+            print("Gemini sent response text: ", response.output_text)
             release_key(current_api_key)
             return OCRResponse.model_validate_json(response.output_text)
         except Exception as e:
+            print("Gemini client raised an exception: ", str(e))
             last_error = e
             err = str(e).lower()
             if logger:
@@ -54,7 +58,6 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> Dict:
 
             if "429" in err or "quota" in err:
                 release_key(current_api_key, to_cool=True)
-                current_api_key = get_key()
                 if current_api_key is None:
                     # every key currently exhausted/cooling down — don't burn retries spinning
                     raise AllKeysExhausted(
@@ -62,6 +65,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> Dict:
                     ) from e
                 continue
             elif any(s in err for s in ("ssl", "eof", "503", "unavailable")):
+                release_key(current_api_key)
                 time.sleep(2**attempt)
                 continue
             else:

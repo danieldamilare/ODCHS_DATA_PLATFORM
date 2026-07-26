@@ -5,11 +5,12 @@ import hashlib
 KEY_POOL = "gemini:api_keys"
 LEASE = "gemini:lease"
 TOTAL = "gemini:total_key"
+LEASE_TRACKER = "gemini:lease_tracker"
 
 
-def set_cooldown(api_key: str):
+def set_cooldown(api_key: str, cool_time: int = 60):
     keyhash = hashlib.md5(api_key.encode()).hexdigest()
-    kv.setex(f"gemini:cooldown:{keyhash}", 60, "")
+    kv.setex(f"gemini:cooldown:{keyhash}", cool_time, "")
 
 
 def is_cooling(api_key: str):
@@ -20,6 +21,7 @@ def is_cooling(api_key: str):
 
 def load_api_keys():
     t = os.getenv("TOTAL_KEY")
+    print("Got total key", t)
     if not t:
         return
     total = int(t) + 1
@@ -46,6 +48,8 @@ def get_key():
             kv.lrem(LEASE, 1, candidate)
             kv.rpush(KEY_POOL, candidate)
         else:
+            keyhash = hashlib.md5(candidate.encode()).hexdigest()
+            kv.setex(f"{LEASE_TRACKER}:{keyhash}", 600, "active")
             return candidate
     return None
 
@@ -54,6 +58,10 @@ def release_key(api_key: str, to_cool: bool = False, cooldown_time: int = 60):
     if not api_key:
         return
     if to_cool:
-        set_cooldown(api_key)
-    kv.lrem(LEASE, 1, api_key)
-    kv.rpush(KEY_POOL, api_key)
+        set_cooldown(api_key, cooldown_time)
+
+    keyhash = hashlib.md5(api_key.encode()).hexdigest()
+    exist = kv.lrem(LEASE, 1, api_key)
+    if exist:
+        kv.delete(f"gemini:lease_tracker:{keyhash}")
+        kv.rpush(KEY_POOL, api_key)

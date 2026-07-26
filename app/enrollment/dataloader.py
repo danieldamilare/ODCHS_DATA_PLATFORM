@@ -1,11 +1,9 @@
-import os
-import time
-import sys
 import json
 import requests
 from app.enrollment.session import session
 from app import kv
 from typing import Optional, Dict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE = "https://odchc-his.org/administrator/functions"
 
@@ -36,8 +34,6 @@ class DataLoader:
         self.load_facilities()
 
     def load_marital_status(self):
-        if self.marital_status is not None:
-            return
 
         cached = kv.get("loader:marital_status")
         if cached:
@@ -52,8 +48,6 @@ class DataLoader:
         self.marital_status = marital_status
 
     def load_citizen_types(self):
-        if self.citizen_types is not None:
-            return
 
         cached = kv.get("loader:citizen_types")
         if cached:
@@ -69,8 +63,6 @@ class DataLoader:
         )
 
     def load_lgas(self):
-        if self.lgas is not None and self.reverse_lga is not None:
-            return
 
         cached_lgas = kv.get("loader:lgas")
         cached_reverse = kv.get("loader:reverse_lga")
@@ -89,9 +81,10 @@ class DataLoader:
         kv.setex("loader:lgas", self.STABLE_TTL, json.dumps(self.lgas))
         kv.setex("loader:reverse_lga", self.STABLE_TTL, json.dumps(self.reverse_lga))
 
+    def _load_wards(self, lga_name, lga_code):
+        return session.get(f"{BASE}?listWard={lga_code}").json()
+
     def load_wards(self):
-        if self.wards is not None and self.reverse_ward is not None:
-            return
 
         cached_wards = kv.get("loader:wards")
         cached_reverse = kv.get("loader:reverse_ward")
@@ -106,21 +99,28 @@ class DataLoader:
 
         self.wards = {}
         self.reverse_ward = {}
-        for lga_name, lga_code in self.lgas.items():
-            res = session.get(f"{BASE}?listWard={lga_code}").json()
-            lga_key = str(lga_code)
-
-            self.wards[lga_key] = {
-                d["narration"].upper().strip(): int(d["code"]) for d in res["data"]
+        count = min(20, len(self.lgas))  # 20 workers since they are i/o
+        with ThreadPoolExecutor(max_workers=count) as executor:
+            results = {
+                executor.submit(self._load_wards, lga_name, lga_code): lga_code
+                for lga_name, lga_code in self.lgas.items()
             }
-            self.reverse_ward[lga_key] = {v: k for k, v in self.wards[lga_key].items()}
+
+            for future in as_completed(results):
+                result = future.result()
+                lga_key = str(results[future])
+                self.wards[lga_key] = {
+                    d["narration"].upper().strip(): int(d["code"])
+                    for d in result["data"]
+                }
+                self.reverse_ward[lga_key] = {
+                    v: k for k, v in self.wards[lga_key].items()
+                }
 
         kv.setex("loader:wards", self.STABLE_TTL, json.dumps(self.wards))
         kv.setex("loader:reverse_ward", self.STABLE_TTL, json.dumps(self.reverse_ward))
 
     def load_facilities(self):
-        if self.facilities is not None and self.reverse_facility is not None:
-            return
 
         cached_fac = kv.get("loader:facilities")
         cached_rev_fac = kv.get("loader:reverse_facilities")
@@ -167,8 +167,12 @@ class DataLoader:
         )
 
 
-def get_loader() -> DataLoader:
-    loader = DataLoader()
-    loader.load_all()
-    return loader
+_loader_instance: Optional[DataLoader] = None
 
+
+def get_loader() -> DataLoader:
+    global _loader_instance
+    if _loader_instance is None:
+        _loader_instance = DataLoader()
+        _loader_instance.load_all()
+    return _loader_instance
