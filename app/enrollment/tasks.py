@@ -61,7 +61,6 @@ def extract_zip_for_processing(path: str, batch_id: str):
                 if not file.is_dir() and is_image_extension(file.filename)
             ]
 
-
             for idx, m in enumerate(imglist):
                 current_name = m.filename
                 m.filename = secure_filename(current_name)
@@ -105,9 +104,13 @@ def extract_zip_for_processing(path: str, batch_id: str):
             db.session.rollback()
 
 
-def _finalize_image_processing(batch_name:str, batch_id:str, form_uuid: str, form_status: FormStatus):
+def _finalize_image_processing(
+    batch_name: str, batch_id: str, form_uuid: str, form_status: FormStatus
+):
     kv.hincrby(batch_name, "done", 1)
     ret = kv.hincrby(batch_name, "remaining", -1)
+    status = kv.hgetall(batch_name)
+
     payload = {"type": "form_ready", "id": form_uuid, "status": form_status.value}
     if ret == 0:
         db.session.execute(
@@ -116,11 +119,13 @@ def _finalize_image_processing(batch_name:str, batch_id:str, form_uuid: str, for
             .values(status=BatchStatus.DONE)
         )
         db.session.commit()
-        kv.hset(batch_name, mapping={"status" : "done"})
-    kv.publish(f"channel:{batch_id}", json.dumps(payload))
-    status = kv.hgetall(batch_name)
+        status["status"] = "done"
+        kv.delete(batch_name)
+
     status_payload = {"type": "status", **status}
     kv.publish(f"channel:{batch_id}", json.dumps(status_payload))
+
+    kv.publish(f"channel:{batch_id}", json.dumps(payload))
 
 
 def llm_extract(img_path):
@@ -178,7 +183,9 @@ def process_image_pipeline(self, form_id: str):
                 db.session.commit()
         except Exception:
             db.session.rollback()
-        _finalize_image_processing(batch_name, batch_id, active_form.uuid, active_form.status)
+        _finalize_image_processing(
+            batch_name, batch_id, active_form.uuid, active_form.status
+        )
 
 
 @celery_app.task

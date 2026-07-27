@@ -13,6 +13,8 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEFAULT_PAGINATION = 20
+    FORM_PATH = os.path.join(BASE_DIR, "forms")
+    PASSPORT_PATH = os.path.join(FORM_PATH, "passports")
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     broker_url = REDIS_URL

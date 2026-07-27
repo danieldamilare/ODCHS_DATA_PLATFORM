@@ -1,6 +1,9 @@
 import os
 import hashlib
 from werkzeug.datastructures import FileStorage
+import io
+from typing import Union
+import base64
 
 
 def compute_hash(file: FileStorage):

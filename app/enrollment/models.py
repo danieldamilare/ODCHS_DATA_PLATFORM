@@ -8,7 +8,6 @@ from app import kv
 class BatchStatus(Enum):
     PROCESSING = "processing"
     DONE = "done"
-    PARTIAL = "partial"
     FAILED = "failed"
 
 
@@ -62,6 +61,7 @@ class Form(db.Model):
         "firstname",
         "othername",
         "dob",
+        "settlement",
         "gender",
         "phone_number",
         "nin",
@@ -80,7 +80,11 @@ class Form(db.Model):
         "passport_ymax",
         "lga_no",
         "ward_no",
+        "genotype",
+        "occupation",
+        "medical_history",
         "facility_no",
+        "passport_path",
     }
 
     id = db.Column(db.Integer, primary_key=True)
@@ -147,23 +151,24 @@ class Form(db.Model):
             "passport_path": self.passport_path,
             "reason": self.reason,
             "error_message": self.error_message,
-            "fields": {
-                "title": self.title,
-                "surname": self.surname,
-                "firstname": self.firstname,
-                "othername": self.othername,
-                "dob": self.dob,
-                "gender": self.gender,
-                "phone_number": self.phone_number,
-                "nin": self.nin,
-                "address": self.address,
-                "category": self.category,
-                "marital_status": self.marital_status,
-                "settlement": self.settlement,
-                "lga_no": self.lga_no,
-                "ward_no": self.ward_no,
-                "facility_no": self.facility_no,
-            },
+            "title": self.title,
+            "surname": self.surname,
+            "firstname": self.firstname,
+            "othername": self.othername,
+            "dob": self.dob,
+            "gender": self.gender,
+            "phone_number": self.phone_number,
+            "nin": self.nin,
+            "address": self.address,
+            "category": self.category,
+            "marital_status": self.marital_status,
+            "settlement": self.settlement,
+            "lga_no": self.lga_no,
+            "ward_no": self.ward_no,
+            "facility_no": self.facility_no,
+            "genotype": self.genotype,
+            "medical_history": self.medical_history,
+            "occupation": self.occupation,
             "next_of_kin": {
                 "firstname": self.kin_firstname,
                 "surname": self.kin_surname,
@@ -172,7 +177,7 @@ class Form(db.Model):
                 "phone_number": self.kin_phone_number,
                 "address": self.kin_address,
             },
-            "crop_coords": {
+            "passport_coord": {
                 "xmin": self.passport_xmin,
                 "ymin": self.passport_ymin,
                 "xmax": self.passport_xmax,
