@@ -20,7 +20,8 @@ class DataLoader:
         self.lgas: Optional[Dict] = None
         self.wards: Optional[Dict] = None
         self.facilities: Optional[Dict] = None
-        self.marital_status: Optional[Dict] = None
+        # notice the his route uses raw string as Marital status so this is dead code
+        # self.marital_status: Optional[Dict] = None
         self.reverse_lga: Optional[Dict] = None
         self.reverse_ward: Optional[Dict] = None
         self.reverse_facility: Optional[Dict] = None
@@ -28,7 +29,7 @@ class DataLoader:
     def load_all(self):
         """Safely loads all mappings, ensuring internal data availability."""
         self.load_citizen_types()
-        self.load_marital_status()
+        # self.load_marital_status()
         self.load_lgas()
         self.load_wards()
         self.load_facilities()

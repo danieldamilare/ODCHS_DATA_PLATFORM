@@ -1,4 +1,4 @@
-SYSTEM_PROMT = '''You are a precision OCR engine for Nigerian healthcare enrollment forms (BHCPF).
+SYSTEM_PROMPT = """You are a precision OCR engine for Nigerian healthcare enrollment forms (BHCPF).
 Your output MUST be valid JSON only. No prose, no markdown, no explanation.
 
 ═══════════════════════════════════════════
@@ -47,4 +47,5 @@ Return this exact JSON structure. No extra fields. No prose.
     "address": ""
   }
 }
-'''
+"""
+

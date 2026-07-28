@@ -16,6 +16,12 @@ class Config:
     FORM_PATH = os.path.join(BASE_DIR, "forms")
     PASSPORT_PATH = os.path.join(FORM_PATH, "passports")
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    MALE_AVATAR_PATH = os.path.join(
+        BASE_DIR, "app", "static", "asset", "male_avatar.jpeg"
+    )
+    FEMALE_AVATAR_PATH = os.path.join(
+        BASE_DIR, "app", "static", "asset", "female_avatar.jpeg"
+    )
 
     broker_url = REDIS_URL
 

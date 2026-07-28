@@ -42,17 +42,34 @@ def is_image_too_blurry(image_path_or_matrix, threshold=200.0, logger=None):
 def correct_form_orentation(img_path_or_matrix, logger=None):
     img = read_image(img_path_or_matrix)
     try:
-        img_low, _ = downscale_image(img)
-        osd = pytesseract.image_to_osd(img_low, config="--psm 0")
-        rotation = int(re.search(r"Rotate:\s*(\d+)", osd).group(1))
-        print(rotation)
+        osd_data = pytesseract.image_to_osd(
+            img, config="--psm 0", output_type=pytesseract.Output.DICT
+        )
+
+        rotation = int(osd_data.get("rotate", 0))
+        confidence = float(osd_data.get("orientation_conf", 0.0))
+
+        if logger:
+            logger.info(
+                f"OSD Results -> Rotation: {rotation}°, Confidence: {confidence}"
+            )
+
+        if confidence < 2.0:
+            if logger:
+                logger.info(
+                    "OSD confidence too low. Skipping rotation to avoid false positives."
+                )
+            return img
+
         if rotation == 90:
             img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
         elif rotation == 180:
             img = cv2.rotate(img, cv2.ROTATE_180)
         elif rotation == 270:
             img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
         return img
+
     except Exception as e:
         if logger:
             logger.info(f"Rotation failed for img: {e}")
@@ -95,4 +112,3 @@ def extract_full_passport_with_backend(img_path_or_matrix, margin=0.27, logger=N
     x2 = min(w_img, x + w + pad_w)
     y2 = min(h_img, y + h + int(pad_h * 1.0))
     return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
-

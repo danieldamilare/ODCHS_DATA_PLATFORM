@@ -92,7 +92,7 @@ class Form(db.Model):
     uuid = db.Column(db.String, unique=True, default=lambda: str(uuid_tool.uuid4()))
     img_path = db.Column(db.Text, nullable=False)
     passport_path = db.Column(db.Text, nullable=True)
-    nin = db.Column(db.String(12), nullable=True)
+    nin = db.Column(db.String(11), nullable=True)
     surname = db.Column(db.String, nullable=True)
     firstname = db.Column(db.String, nullable=True)
     othername = db.Column(db.String, nullable=True)
@@ -102,7 +102,7 @@ class Form(db.Model):
     phone_number = db.Column(db.String, nullable=True)
     settlement = db.Column(db.String(5), nullable=True)
     category = db.Column(db.Integer, nullable=True)
-    marital_status = db.Column(db.Integer, nullable=True)
+    marital_status = db.Column(db.String(15), nullable=True)
 
     batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False)
     # enrollee_number is returned from the HIS, useful if we add ID card generation
