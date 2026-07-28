@@ -15,7 +15,8 @@ import uuid
 import os
 import zipfile
 import cv2
-import datetime
+import base64
+from datetime import datetime
 
 
 @dataclass
@@ -144,10 +145,12 @@ class FormEnrollmentState(Enum):
     HIS_DUPLICATE = auto()
     SUCCESS = auto()
 
+
 @dataclass
 class FormEnrollmentResult:
     status: FormEnrollmentState
     msg: str
+
 
 class FormServices:
     def get(self, form_id) -> Optional[Form]:
@@ -180,29 +183,31 @@ class FormServices:
             )
         return FormPassportUpdateResult(True, "Successfully update passport")
 
-
-    def enroll(self, form_id, strict=True):
+    def enroll(self, form_id):
         from app.enrollment.his_client import create_enrolle_with_retry
 
         form = self.get(form_id)
         if not form:
-            return FormEnrollmentResult(FormEnrollmentState.NOT_EXISTS, "No form with the given id")
+            return FormEnrollmentResult(
+                FormEnrollmentState.NOT_EXISTS, "No form with the given id"
+            )
 
         has_coords = form.passport_xmax is not None and form.passport_xmax > 0
 
         if not form.passport_path and not has_coords:
-            if strict:
-                return FormEnrollmentResult(
-                    FormEnrollmentState.NO_PASSPORT_ERROR,
-                    "Refusing to enroll form without passport, check (enroll without passport) to force enrollment",
-                )
-            b64_passport = ""
+            return FormEnrollmentResult(
+                FormEnrollmentState.NO_PASSPORT_ERROR,
+                "Refusing to enroll form without passport, check (enroll without passport) to force enrollment",
+            )
         else:
             if form.passport_path:
                 img = read_image(form.passport_path)
             else:
                 img = read_image(form.img_path)
-                img = img[form.passport_ymin:form.passport_ymax, form.passport_xmin:form.passport_xmax]
+                img = img[
+                    form.passport_ymin : form.passport_ymax,
+                    form.passport_xmin : form.passport_xmax,
+                ]
             _, buf = cv2.imencode(".jpg", img)
             b64_passport = base64.b64encode(buf).decode("utf-8")
 
@@ -249,7 +254,11 @@ class FormServices:
             form.error_message = result.msg
 
         db.session.commit()
-        state = FormEnrollmentState.SUCCESS if result.success else FormEnrollmentState.HIS_ERROR
+        state = (
+            FormEnrollmentState.SUCCESS
+            if result.success
+            else FormEnrollmentState.HIS_ERROR
+        )
         if "exists" in result.msg.lower():
             state = FormEnrollmentState.HIS_DUPLICATE
         return FormEnrollmentResult(state, result.msg)

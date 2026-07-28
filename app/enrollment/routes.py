@@ -12,12 +12,17 @@ from app.enrollment.models import BatchStatus, Batch, Form, FormStatus
 from app import db
 import sqlalchemy as sa
 from app.enrollment.schema import BatchUploader, FormPassPortUploader, FormUpdater
-from app.enrollment.services import BatchServices, BatchJobResult, FormServices, FormEnrollmentState
+from app.enrollment.services import (
+    BatchServices,
+    BatchJobResult,
+    FormServices,
+    FormEnrollmentState,
+)
 from app.enrollment.dataloader import get_loader
 from pydantic import ValidationError
 from app.enrollment import enrollment_bp
+from app.enrollment.tasks import process_image_pipeline
 from app import kv
-from typing import Optional
 import json
 import os
 
@@ -100,6 +105,42 @@ def batch_post():
     )
 
 
+@enrollment_bp.get("/batches/<string:batch_id>/forms")
+def get_batch_forms(batch_id: str):
+    batch_service = BatchServices()
+    batch = batch_service.get(batch_id)
+    if not batch:
+        return jsonify({"success": False, "msg": "No batch with the given id"}), 404
+
+    status_filter = request.args.get("status")
+    after = request.args.get("after")
+    count = int(request.args.get("count", 20))
+
+    query = sa.select(Form).where(Form.batch_id == batch.id)
+
+    if status_filter:
+        query = query.where(Form.status == FormStatus(status_filter))
+
+    if after:
+        cursor_form = db.session.scalar(
+            sa.select(Form.sequence).where(Form.uuid == after)
+        )
+        if cursor_form is not None:
+            query = query.where(Form.sequence > cursor_form)
+
+    query = query.order_by(Form.sequence.asc()).limit(count)
+
+    forms = db.session.scalars(query).all()
+
+    return jsonify(
+        {
+            "success": True,
+            "data": [f.to_dict() for f in forms],
+            "has_more": len(forms) == count,
+        }
+    )
+
+
 @enrollment_bp.get("/batches/<string:batch_id>")
 def get_batch_id(batch_id: str):
     batch_service = BatchServices()
@@ -167,6 +208,7 @@ def get_batch_progress_stream(batch_id: str):
 
             while True:
                 message = subscriber.get_message(timeout=15)
+                print(f"got message: {message}")
                 if message is None:
                     yield ": heartbeat\n\n"
 
@@ -252,7 +294,11 @@ def get_form(form_id: str):
     data = form.to_dict()
     data["img_path"] = url_for("enrollment.get_form_asset", asset_id=form.uuid)
     if data["passport_path"]:
-        data["passport_path"] = url_for("enrollment.get_passport_asset", asset_id= form.uuid)
+        data["passport_path"] = url_for(
+            "enrollment.get_passport_asset", asset_id=form.uuid
+        )
+    data["MALE_AVATAR"] = url_for("static", filename="asset/male_avatar.jpeg")
+    data["FEMALE_AVATAR"] = url_for("static", filename="asset/female_avatar.jpeg")
     return jsonify({"success": True, "msg": "Successfully Got form", "data": data})
 
 
@@ -303,6 +349,12 @@ def update_form(form_id: str):
     for key, value in updater.get_updates().items():
         if key in form.UPDATABLE_FIELDS:
             setattr(form, key, value)
+    if updater.use_avatar:
+        gender = form.gender
+        if gender.lower() == "male":
+            form.passport_path = current_app.config["MALE_AVATAR_PATH"]
+        elif gender.lower() == "female":
+            form.passport_path = current_app.config["FEMALE_AVATAR_PATH"]
     try:
         db.session.add(form)
         db.session.commit()
@@ -315,12 +367,47 @@ def update_form(form_id: str):
         )
     ), 200
 
+
+@enrollment_bp.post("/form/<string:form_id>/rescan")
+def rescan_form(form_id: str):
+    form_service = FormServices()
+    form = form_service.get(form_id)
+    if not form:
+        return jsonify({"success": False, "msg": "No form with the given id"}), 404
+    if form.status != FormStatus.NEED_RESCAN:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "msg": "Only forms flagged for rescan can be replaced",
+                }
+            ),
+            400,
+        )
+
+    new_image = request.files.get("image")
+    if not new_image:
+        return jsonify({"success": False, "msg": "No replacement image provided"}), 400
+
+    new_image.save(form.img_path)  # overwrite in place, same path
+    form.status = FormStatus.PENDING
+    form.error_message = None
+    form.reason = None
+    db.session.commit()
+
+    process_image_pipeline.delay(form.uuid, is_batch=False)
+    return jsonify({"success": True, "msg": "New scan queued for processing"}), 202
+
+
 @enrollment_bp.post("/form/<string:form_id>/reject")
 def reject_form(form_id: str):
     form_service = FormServices()
-    form =  form_service.get(form_id)
+    form = form_service.get(form_id)
     if not form:
-        return (jsonify({"success": False, "msg": "No form exists with the given id"}), 404)
+        return (
+            jsonify({"success": False, "msg": "No form exists with the given id"}),
+            404,
+        )
 
     reason = (request.get_json(silent=True) or {}).get("reason", "")
     if reason:
@@ -328,31 +415,61 @@ def reject_form(form_id: str):
     form.status = FormStatus.REJECTED
     db.session.add(form)
     db.session.commit()
-    return (jsonify({"success": True, "msg": "rejected"}))
+    return jsonify({"success": True, "msg": "rejected"})
 
 
 @enrollment_bp.post("/form/<string:form_id>/enroll")
 def enroll_form(form_id: str):
     form_service = FormServices()
-    strict = (request.get_json(silent=True) or {}).get("strict", True)
-    result = form_service.enroll(form_id, strict=strict)
+    result = form_service.enroll(form_id)
 
     if result.status == FormEnrollmentState.NOT_EXISTS:
-        return jsonify({"success": False,  "status": "error", "msg": result.msg}), 404
+        return jsonify({"success": False, "status": "error", "msg": result.msg}), 404
     if result.status == FormEnrollmentState.NO_PASSPORT_ERROR:
-        return jsonify({"success": False,  "status": "error",  "msg": result.msg}), 422
+        return jsonify({"success": False, "status": "error", "msg": result.msg}), 422
     if result.status == FormEnrollmentState.HIS_ERROR:
-        return jsonify({"success": False, "status" : "error", "msg": result.msg}), 502
-        status = "duplicate" if result.status == FormEnrollmentState.HIS_DUPLICATE else "enrolled"
+        return jsonify({"success": False, "status": "error", "msg": result.msg}), 502
+    status = (
+        "duplicate"
+        if result.status == FormEnrollmentState.HIS_DUPLICATE
+        else "enrolled"
+    )
 
     return jsonify({"success": True, "status": status, "msg": result.msg}), 200
+
+
+@enrollment_bp.post("/form/<string:form_id>/reprocess")
+def reprocess_form(form_id: str):
+    form_service = FormServices()
+    form = form_service.get(form_id)
+
+    if not form:
+        return jsonify({"success": False, "msg": "No form with the given id"}), 404
+    if form.status not in (FormStatus.ERROR, FormStatus.NEED_RESCAN):
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "msg": "Only errored or rescan forms can be reprocessed",
+                }
+            ),
+            400,
+        )
+
+    form.status = FormStatus.PENDING
+    form.error_message = None
+    form.reason = None
+    db.session.commit()
+
+    process_image_pipeline.delay(form.uuid, is_batch=False)
+    return jsonify({"success": True, "msg": "Form queued for reprocessing"}), 202
 
 
 @enrollment_bp.get("/lgas")
 def get_lgas():
     loader = get_loader()
-
-    return jsonify([{"id": code, "name": name} for name, code in loader.lgas.items()])
+    lga = loader.lgas or {}
+    return jsonify([{"id": code, "name": name} for name, code in lga.items()])
 
 
 @enrollment_bp.route("/wards/<int:lga_id>")
@@ -367,3 +484,10 @@ def get_facilities(ward_id):
     loader = get_loader()
     facilities = loader.facilities.get(str(ward_id), {})
     return jsonify([{"id": code, "name": name} for name, code in facilities.items()])
+
+
+@enrollment_bp.route("/categories")
+def get_categories():
+    loader = get_loader()
+    citizen_types = loader.citizen_types or {}
+    return jsonify([{"id": code, "name": name} for name, code in citizen_types.items()])

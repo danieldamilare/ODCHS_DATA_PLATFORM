@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from werkzeug.datastructures import FileStorage
 from app.enrollment.utils import validate_zip_file
@@ -67,35 +67,53 @@ class FormPassPortUploader(BaseModel):
 
 
 class FormUpdater(BaseModel):
-    title: Optional[str] = None
-    surname: Optional[str] = None
-    firstname: Optional[str] = None
+    title: str
+    surname: str
+    firstname: str
     othername: Optional[str] = None
-    dob: Optional[str] = None
-    settlement: Optional[str] = None
-    gender: Optional[str] = None
-    phone_number: Optional[str] = None
-    nin: Optional[str] = None
-    address: Optional[str] = None
-    category: Optional[int] = None
-    marital_status: Optional[int] = None
+    dob: str
+    settlement: Literal["Urban", "Rural"]
+    gender: Literal["Male", "Female"]
+    phone_number: str
+    nin: str
+    address: str
+    category: int
+    marital_status: str
     occupation: Optional[str] = None
-    genotype: Optional[str] = None
-    medical_history: Optional[str] = None
-    kin_firstname: Optional[str] = None
-    kin_surname: Optional[str] = None
+    kin_firstname: str
+    kin_surname: str
     kin_othername: Optional[str] = None
-    kin_relationship: Optional[str] = None
-    kin_phone_number: Optional[str] = None
-    kin_address: Optional[str] = None
+    kin_relationship: str
+    kin_phone_number: str
+    kin_address: str
     passport_xmin: Optional[int] = None
     passport_ymin: Optional[int] = None
     passport_xmax: Optional[int] = None
     passport_ymax: Optional[int] = None
-    lga_no: Optional[int] = None
-    ward_no: Optional[int] = None
-    facility_no: Optional[int] = None
+    lga_no: int
+    ward_no: int
+    facility_no: int
     passport_path: Optional[str] = None
+    use_avatar: Optional[bool] = False
+
+    @field_validator("nin")
+    @classmethod
+    def validate_nin(cls, nin: str):
+        if nin.isdigit() and len(nin) == 11:
+            return nin
+        raise ValueError("Invalid Nin provided")
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, phone_number: str):
+        # frontend always provide leading prefix
+        if not phone_number.startswith("+234"):
+            raise ValueError("Invalid Phone number: Phone number must starts with +234")
+        if not phone_number[1:].isdigit():
+            raise ValueError("Phone number must all be digit")
+        if len(phone_number) != 14:
+            raise ValueError("Incomplete Phone number")
+        return phone_number
 
     def get_updates(self) -> dict:
         return {k: v for k, v in self.model_dump().items() if v is not None}

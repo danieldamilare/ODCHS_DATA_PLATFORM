@@ -104,14 +104,18 @@ def extract_zip_for_processing(path: str, batch_id: str):
             db.session.rollback()
 
 
-def _finalize_image_processing(
-    batch_name: str, batch_id: str, form_uuid: str, form_status: FormStatus
-):
+def _finalize_image_processing(batch_name: str, batch_id: str, form: Form):
     kv.hincrby(batch_name, "done", 1)
     ret = kv.hincrby(batch_name, "remaining", -1)
     status = kv.hgetall(batch_name)
 
-    payload = {"type": "form_ready", "id": form_uuid, "status": form_status.value}
+    payload = {
+        "type": "form_ready",
+        "id": form.uuid,
+        "status": form.status.value,
+        "surname": form.surname or "",
+        "firstname": form.firstname or "",
+    }
     if ret == 0:
         db.session.execute(
             sa.update(Batch)
@@ -132,8 +136,33 @@ def llm_extract(img_path):
     return gemini_client(img_path)
 
 
+def _process_image_pipeline(form: Form, batch: Batch):
+    image_matrix = read_image(form.img_path)
+    if is_image_too_blurry(image_matrix):
+        form.status = FormStatus.NEED_RESCAN
+        form.reason = "Image is too blurry. Please rescan"
+        db.session.commit()
+        return
+
+    correct_form = correct_form_orentation(image_matrix)
+    desc, path = tempfile.mkstemp(suffix=os.path.splitext(form.img_path)[1])
+    os.close(desc)
+    cv2.imwrite(path, correct_form)
+    os.replace(path, form.img_path)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        futures = executor.submit(llm_extract, form.img_path)
+        coords = extract_full_passport_with_backend(correct_form)
+        res = futures.result()
+    form = normalize_form_object(form, batch, res, coords)
+    form.status = FormStatus.READY
+
+    db.session.add(form)
+    db.session.commit()
+
+
 @celery_app.task(bind=True)
-def process_image_pipeline(self, form_id: str):
+def process_image_pipeline(self, form_id: str, is_batch=True):
     form: Optional[Form] = db.session.scalar(
         sa.select(Form).where(Form.uuid == form_id)
     )
@@ -145,30 +174,9 @@ def process_image_pipeline(self, form_id: str):
     batch_name = f"batch:{batch_id}"
 
     try:
-        image_matrix = read_image(form.img_path)
-        if is_image_too_blurry(image_matrix):
-            form.status = FormStatus.NEED_RESCAN
-            db.session.commit()
-            _finalize_image_processing(batch_name, batch_id, form.uuid, form.status)
-            return
-
-        correct_form = correct_form_orentation(image_matrix)
-        desc, path = tempfile.mkstemp(suffix=os.path.splitext(form.img_path)[1])
-        os.close(desc)
-        cv2.imwrite(path, correct_form)
-        os.replace(path, form.img_path)
-
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            futures = executor.submit(llm_extract, form.img_path)
-            coords = extract_full_passport_with_backend(correct_form)
-            res = futures.result()
-        form = normalize_form_object(form, batch, res, coords)
-        form.status = FormStatus.READY
-
-        db.session.add(form)
-        db.session.commit()
-
-        _finalize_image_processing(batch_name, batch_id, form.uuid, form.status)
+        _process_image_pipeline(form, batch)
+        if is_batch:
+            _finalize_image_processing(batch_name, batch_id, form)
 
     except AllKeysExhausted as e:
         raise self.retry(countdown=15 * 60)
@@ -183,9 +191,8 @@ def process_image_pipeline(self, form_id: str):
                 db.session.commit()
         except Exception:
             db.session.rollback()
-        _finalize_image_processing(
-            batch_name, batch_id, active_form.uuid, active_form.status
-        )
+        if is_batch and active_form:
+            _finalize_image_processing(batch_name, batch_id, active_form)
 
 
 @celery_app.task
