@@ -110,25 +110,28 @@ def batch_post():
 @enrollment_bp.get("/batches/<string:batch_id>/forms/download")
 def download_batch_forms(batch_id: str):
     batch_service = BatchServices()
-    status_filter = request.args.get("status")
-    result = batch_service.download_forms(batch_id, status_filter)
-    if result.status == "invalid":
-        return jsonify({"success": False, "msg": "No batch with the given id"}), 404
-    response = Response(result.generator, mimetype="application/zip")
-    response.headers['Content-Disposition'] = f'attachment; filename= {batch_id}.zip'
-    return response
+    status_filter = request.args.get("status", None)
+    download_type = request.args.get("type", None)
 
-@enrollment_bp.get("/batches/<string:batch_id>/idcard/download")
-def download_batch_id_card(batch_id: str):
-    batch_service = BatchServices()
-    result = batch_service.start_id_card_generation()
-    if result.status == "invalid":
-        return jsonify({"success": False, "msg": "No batch with the given id"}), 404
-    return jsonify({
-        "success": True,
-        "msg": result.msg,
-        "download_link": result.download_link
-        })
+    if not download_type:
+        return jsonify({"success": False, "msg": "Please select a download type"}), 400
+
+    if download_type.strip().lower() == 'form':
+        result = batch_service.download_forms(batch_id, status_filter)
+        if result.status == "invalid":
+            return jsonify({"success": False, "msg": result.msg}), 400
+        elif result.status ==  "404":
+            return jsonify({"success": False, "msg": result.msg}), 404
+
+        response = Response(result.generator, mimetype="application/zip")
+        response.headers['Content-Disposition'] = f'attachment; filename={result.filename}'
+        return response
+    elif download_type.strip().lower() =="idcard":
+        result = batch_service.start_id_card_generation()
+        # handle return
+    else:
+        return jsonify({"success": False, "msg": f"Invalid download type {download_type}. Use 'form' or 'idcard' as type"}), 400
+
 
 @enrollment_bp.get("/batches/<string:batch_id>/forms")
 def get_batch_forms(batch_id: str):
@@ -292,8 +295,6 @@ def _serve_form_file(asset_id: str, as_attachment:bool = False):
             os.path.basename(form.img_path),
             as_attachment=True,
         )
-
-
 
 
 
