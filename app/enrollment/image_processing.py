@@ -14,6 +14,17 @@ def read_image(image_path_or_matrix):
     return img
 
 
+def rotate_image(img_path, angle: int):
+    img = read_image(img_path)
+    if angle == 90:
+        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+    elif angle == 180:
+        img = cv2.rotate(img, cv2.ROTATE_180)
+    elif angle == 270:
+        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    cv2.imwrite(img_path, img)
+
+
 def downscale_image(img, target_width=1000):
     h_img, w_img = img.shape[:2]
     if w_img <= target_width:

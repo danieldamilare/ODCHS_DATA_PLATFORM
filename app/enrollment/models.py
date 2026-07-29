@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid as uuid_tool
 from app import db
 from app import kv
+from flask import url_for
 
 
 class BatchStatus(Enum):
@@ -141,14 +142,30 @@ class Form(db.Model):
     passport_ymin = db.Column(db.Integer, nullable=True)
     passport_xmax = db.Column(db.Integer, nullable=True)
     passport_ymax = db.Column(db.Integer, nullable=True)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def to_dict(self):
+        img_path = url_for(
+            "enrollment.get_form_asset",
+            asset_id=self.uuid,
+            v=(int(self.updated_at.timestamp())),
+        )
+        if self.passport_path:
+            passport_path = url_for(
+                "enrollment.get_passport_asset",
+                asset_id=self.uuid,
+                v=int(self.updated_at.timestamp()),
+            )
+        else:
+            passport_path = None
         return {
             "id": self.uuid,
             "sequence": self.sequence,
             "status": self.status.value,
-            "img_path": self.img_path,
-            "passport_path": self.passport_path,
+            "img_path": img_path,
+            "passport_path": passport_path,
             "reason": self.reason,
             "error_message": self.error_message,
             "title": self.title,

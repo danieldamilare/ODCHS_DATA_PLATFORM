@@ -5,7 +5,8 @@ from app.enrollment.utils import compute_hash, is_image_extension
 from app.enrollment.dataloader import get_loader
 from app.enrollment.tasks import extract_zip_for_processing
 from werkzeug.datastructures import FileStorage
-from app.enrollment.image_processing import read_image
+from app.enrollment.image_processing import read_image, rotate_image
+from app.enrollment.schema import FormUpdater
 from enum import Enum, auto
 from app import kv
 import sqlalchemy as sa
@@ -23,6 +24,33 @@ from datetime import datetime
 class BatchJobResult:
     status: Literal["created", "duplicate", "save_failed", "empty_zip"]
     batch: Optional[Batch] = None
+
+
+@dataclass
+class FormPassportUpdateResult:
+    success: bool
+    msg: str
+
+
+class FormEnrollmentState(Enum):
+    NOT_EXISTS = auto()
+    HIS_ERROR = auto()
+    NO_PASSPORT_ERROR = auto()
+    HIS_DUPLICATE = auto()
+    SUCCESS = auto()
+
+
+@dataclass
+class FormEnrollmentResult:
+    status: FormEnrollmentState
+    msg: str
+
+
+@dataclass
+class FormUpdateResult:
+    status: Literal["rotate_error", "db_error", "success", "invalid"]
+    msg: str
+    form: Optional[Form] = None
 
 
 class BatchServices:
@@ -130,26 +158,6 @@ class BatchServices:
             sa.select(Batch).where(Batch.uuid == batch_id)
         )
         return batch
-
-
-@dataclass
-class FormPassportUpdateResult:
-    success: bool
-    msg: str
-
-
-class FormEnrollmentState(Enum):
-    NOT_EXISTS = auto()
-    HIS_ERROR = auto()
-    NO_PASSPORT_ERROR = auto()
-    HIS_DUPLICATE = auto()
-    SUCCESS = auto()
-
-
-@dataclass
-class FormEnrollmentResult:
-    status: FormEnrollmentState
-    msg: str
 
 
 class FormServices:
@@ -262,3 +270,39 @@ class FormServices:
         if "exists" in result.msg.lower():
             state = FormEnrollmentState.HIS_DUPLICATE
         return FormEnrollmentResult(state, result.msg)
+
+    def update_form(self, form_id, updater: FormUpdater):
+        form = db.session.scalar(sa.select(Form).where(Form.uuid == form_id))
+        if not form:
+            return FormUpdateResult("invalid", "No form with the given id")
+
+        for key, value in updater.get_updates().items():
+            if key in form.UPDATABLE_FIELDS:
+                setattr(form, key, value)
+
+        if updater.use_avatar:
+            gender = form.gender
+            if gender.lower() == "male":
+                form.passport_path = current_app.config["MALE_AVATAR_PATH"]
+            elif gender.lower() == "female":
+                form.passport_path = current_app.config["FEMALE_AVATAR_PATH"]
+
+        if updater.rotate_angle:
+            if updater.passport_xmin is None and form.passport_path is None:
+                return FormUpdateResult(
+                    "rotate_error",
+                    "Please set a new passport crop coordinate, cannot use a stale coordinate on a rotated imge",
+                )
+            try:
+                rotate_image(form.img_path, updater.rotate_angle)
+            except Exception as e:
+                return FormUpdateResult(
+                    "rotate_error", "Unable to update form due to image rotation"
+                )
+        try:
+            db.session.add(form)
+            db.session.commit()
+            return FormUpdateResult("success", "Successfully update form", form)
+        except Exception as e:
+            db.session.rollback()
+            return FormUpdateResult("db_error", "Error updating form")

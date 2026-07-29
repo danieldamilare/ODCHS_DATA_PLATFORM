@@ -3,6 +3,8 @@ from app.enrollment.llm.prompt import SYSTEM_PROMPT
 from app.enrollment.schema import OCRResponse
 from flask import current_app
 from google import genai
+from google.genai.errors import ClientError, ServerError
+import httpx
 import time
 
 
@@ -14,7 +16,7 @@ class LLMExtractionFailed(Exception):
     pass
 
 
-MODEL_NAME = "gemini-3.5-flash"
+MODEL_NAME = "gemini-3.6-flash"
 
 
 def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
@@ -29,9 +31,11 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
         if current_api_key is None:
             raise AllKeysExhausted()
         keys_tried += 1
+
         try:
             client = genai.Client(api_key=current_api_key)
             uploaded_file = client.files.upload(file=image_path)
+            print("Successfully uploaded file about to create interaction")
             response = client.interactions.create(
                 model=MODEL_NAME,
                 system_instruction=SYSTEM_PROMPT,
@@ -53,25 +57,40 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
             release_key(current_api_key)
             return OCRResponse.model_validate_json(response.output_text)
 
-        except Exception as e:
-            print("Gemini client raised an exception: ", str(e))
+        except ClientError as e:
+            print(f"Gemini Client Error encountered: {e}")
             last_error = e
-            err = str(e).lower()
-            if logger:
-                logger.info(f"Gemini attempt {attempt} failed: {e}")
 
-            if "429" in err or "quota" in err:
-                print("Error cuaght in 429 path")
+            status_code = getattr(e, "code", None)
+
+            if status_code == 429 or "429" in str(e) or "quota" in str(e).lower():
+                print("Rate limit hit, cooling key...")
                 release_key(current_api_key, to_cool=True)
                 time.sleep(1)
-                continue
-            elif any(s in err for s in ("ssl", "eof", "503", "unavailable")):
-                release_key(current_api_key)
-                attempt += 1
-                time.sleep(2**attempt)
                 continue
             else:
                 release_key(current_api_key)
                 raise
 
+        except ServerError as e:
+            print(f"Gemini Server Error encountered: {e}")
+            last_error = e
+
+            release_key(current_api_key)
+            attempt += 1
+            time.sleep(2**attempt)
+            continue
+
+        except (httpx.TimeoutException, httpx.NetworkError) as e:
+            print(f"Network transport error encountered: {e}")
+            last_error = e
+
+            release_key(current_api_key)
+            attempt += 1
+            time.sleep(2**attempt)
+            continue
+
+        except Exception as e:
+            release_key(current_api_key)
+            raise
     raise ValueError(f"Max retries exceeded: {last_error}")
