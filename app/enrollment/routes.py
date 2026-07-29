@@ -6,6 +6,7 @@ from flask import (
     Response,
     stream_with_context,
     send_from_directory,
+    send_file,
     url_for,
 )
 from app.enrollment.models import BatchStatus, Batch, Form, FormStatus
@@ -17,6 +18,7 @@ from app.enrollment.services import (
     BatchJobResult,
     FormServices,
     FormEnrollmentState,
+    FormUpdateResult,
 )
 from app.enrollment.dataloader import get_loader
 from pydantic import ValidationError
@@ -104,6 +106,29 @@ def batch_post():
         202,
     )
 
+
+@enrollment_bp.get("/batches/<string:batch_id>/forms/download")
+def download_batch_forms(batch_id: str):
+    batch_service = BatchServices()
+    status_filter = request.args.get("status")
+    result = batch_service.download_forms(batch_id, status_filter)
+    if result.status == "invalid":
+        return jsonify({"success": False, "msg": "No batch with the given id"}), 404
+    response = Response(result.generator, mimetype="application/zip")
+    response.headers['Content-Disposition'] = f'attachment; filename= {batch_id}.zip'
+    return response
+
+@enrollment_bp.get("/batches/<string:batch_id>/idcard/download")
+def download_batch_id_card(batch_id: str):
+    batch_service = BatchServices()
+    result = batch_service.start_id_card_generation()
+    if result.status == "invalid":
+        return jsonify({"success": False, "msg": "No batch with the given id"}), 404
+    return jsonify({
+        "success": True,
+        "msg": result.msg,
+        "download_link": result.download_link
+        })
 
 @enrollment_bp.get("/batches/<string:batch_id>/forms")
 def get_batch_forms(batch_id: str):
@@ -250,20 +275,32 @@ def get_batch_progress_stream(batch_id: str):
         },
     )
 
-
-@enrollment_bp.get("/asset/form/<string:asset_id>")
-def get_form_asset(asset_id: str):
+def _serve_form_file(asset_id: str, as_attachment:bool = False):
     form_service = FormServices()
     form = form_service.get(asset_id)
     if not form:
         return (jsonify({"success": False, "msg": "Asset cannot be found"}), 404)
-    return send_from_directory(
-        os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
-        os.path.basename(form.img_path),
-        as_attachment=True,
-    )
+    if not as_attachment:
+        return send_from_directory(
+            os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
+            os.path.basename(form.img_path),
+            max_age=86400,
+        )
+    else:
+        return send_from_directory(
+            os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
+            os.path.basename(form.img_path),
+            as_attachment=True,
+        )
 
 
+
+
+
+@enrollment_bp.get("/asset/form/<string:asset_id>")
+def get_form_asset(asset_id: str):
+    return _serve_form_file(asset_id= asset_id, as_attachment=False)
+    
 @enrollment_bp.get("/asset/passport/<string:asset_id>")
 def get_passport_asset(asset_id: str):
     form_service = FormServices()
@@ -273,7 +310,7 @@ def get_passport_asset(asset_id: str):
     return send_from_directory(
         os.path.join(current_app.config["PASSPORT_PATH"], form.batch.uuid),
         os.path.basename(form.passport_path),
-        as_attachment=True,
+        max_age=86400,
     )
 
 
@@ -292,13 +329,13 @@ def get_form(form_id: str):
             404,
         )
     data = form.to_dict()
-    data["img_path"] = url_for("enrollment.get_form_asset", asset_id=form.uuid)
-    if data["passport_path"]:
-        data["passport_path"] = url_for(
-            "enrollment.get_passport_asset", asset_id=form.uuid
-        )
-    data["MALE_AVATAR"] = url_for("static", filename="asset/male_avatar.jpeg")
-    data["FEMALE_AVATAR"] = url_for("static", filename="asset/female_avatar.jpeg")
+
+    data["MALE_AVATAR"] = url_for(
+        "static", filename="asset/male_avatar.jpeg", _external=True
+    )
+    data["FEMALE_AVATAR"] = url_for(
+        "static", filename="asset/female_avatar.jpeg", _external=True
+    )
     return jsonify({"success": True, "msg": "Successfully Got form", "data": data})
 
 
@@ -329,43 +366,26 @@ def update_form_passport(form_id: str):
 
 @enrollment_bp.patch("/form/<string:form_id>")
 def update_form(form_id: str):
-    form_service = FormServices()
-    form = form_service.get(form_id)
-    if not form:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "msg": "No form with the given id",
-                }
-            ),
-            404,
-        )
-
     try:
         updater = FormUpdater(**request.get_json(silent=True) or {})
     except ValidationError as e:
         return jsonify({"success": False, "msg": e.errors(include_url=False)}), 400
-    for key, value in updater.get_updates().items():
-        if key in form.UPDATABLE_FIELDS:
-            setattr(form, key, value)
-    if updater.use_avatar:
-        gender = form.gender
-        if gender.lower() == "male":
-            form.passport_path = current_app.config["MALE_AVATAR_PATH"]
-        elif gender.lower() == "female":
-            form.passport_path = current_app.config["FEMALE_AVATAR_PATH"]
-    try:
-        db.session.add(form)
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        return (jsonify({"success": False, "msg": "Error updating form"})), 500
-    return (
-        jsonify(
-            {"success": True, "msg": "Successful updated form", "data": form.to_dict()}
+    form_service = FormServices()
+    result: FormUpdateResult = form_service.update_form(form_id, updater)
+
+    if result.status == "rotate_error":
+        return (jsonify({"success": False, "msg": result.msg}), 400)
+    elif result.status == "db_error":
+        return (jsonify({"success": False, "msg": result.msg}), 500)
+    elif result.status == "invalid":
+        return (jsonify({"success": False, "msg": result.msg}), 404)
+    else:
+        return (
+            jsonify(
+                {"success": True, "msg": result.msg, "data": result.form.to_dict()}
+            ),
+            200,
         )
-    ), 200
 
 
 @enrollment_bp.post("/form/<string:form_id>/rescan")
@@ -463,6 +483,21 @@ def reprocess_form(form_id: str):
 
     process_image_pipeline.delay(form.uuid, is_batch=False)
     return jsonify({"success": True, "msg": "Form queued for reprocessing"}), 202
+
+@enrollment_bp.get("/form/<string:form_id>/download")
+def download_form(form_id: str):
+    return _serve_form_file(form_id, as_attachment=True)
+
+
+
+@enrollment_bp.get("/form/<string:form_id>/download")
+def download_form_idcard(form_id: str):
+    type = request.args.get()
+    form_service = FormServices()
+    result = form_service.download_id_card(form_id)
+    if result.status == "invalid":
+        return jsonify({"success": False, "msg": "No form with the given id"}), 404
+    return send_file(result.file, mimetype="application/jpeg", as_attachment=True, download_name = result.download_name)
 
 
 @enrollment_bp.get("/lgas")
