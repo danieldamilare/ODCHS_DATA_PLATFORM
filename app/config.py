@@ -22,6 +22,19 @@ class Config:
     FEMALE_AVATAR_PATH = os.path.join(
         BASE_DIR, "app", "static", "asset", "female_avatar.jpeg"
     )
+    HIS_SESSION_CONFIG = {
+        "user_id": os.getenv("HIS_USER_ID"),
+        "deployState": os.getenv("HIS_DEPLOY_STATE"),
+        "staffType": os.getenv("HIS_STAFF_TYPE"),
+        "name": os.getenv("HIS_NAME"),
+        "emailAddress": os.getenv("HIS_EMAIL_ADDRESS"),
+        "mobileNo": os.getenv("HIS_MOBILE_NO"),
+        "organisation": os.getenv("HIS_ORGANIZATION"),
+        "department": os.getenv("HIS_DEPARTMENT"),
+        "jobtitle": os.getenv("HIS_JOBTITLE"),
+        "Origin": os.getenv("HIS_WEBSITE_ORIGIN"),
+        "Referer": os.getenv("HIS_WEBSITE_REFERER"),
+    }
 
     broker_url = REDIS_URL
 

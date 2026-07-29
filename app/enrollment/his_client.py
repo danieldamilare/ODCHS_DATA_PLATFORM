@@ -1,4 +1,4 @@
-from app.enrollment.session import session
+from app.enrollment.session import get_his_session
 import time
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
@@ -143,6 +143,7 @@ def create_enrolle(data: Dict):
         "children": [],
     }
     url = f"{BASE}?createEnrollee"
+    session = get_his_session()
     res = session.post(url, json=json_form, timeout=40)
     print("Gotten message from server", res.text)
 

@@ -1,6 +1,5 @@
 import json
-import requests
-from app.enrollment.session import session
+from app.enrollment.session import get_his_session
 from app import kv
 from typing import Optional, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -25,6 +24,7 @@ class DataLoader:
         self.reverse_lga: Optional[Dict] = None
         self.reverse_ward: Optional[Dict] = None
         self.reverse_facility: Optional[Dict] = None
+        self.session = get_his_session()
 
     def load_all(self):
         """Safely loads all mappings, ensuring internal data availability."""
@@ -41,7 +41,7 @@ class DataLoader:
             self.marital_status = json.loads(cached)
             return
 
-        res = session.get(f"{BASE}?listMStatus").json()
+        res = self.session.get(f"{BASE}?listMStatus").json()
         marital_status = {
             dec["narration"].upper().strip(): int(dec["code"]) for dec in res["data"]
         }
@@ -55,7 +55,7 @@ class DataLoader:
             self.citizen_types = json.loads(cached)
             return
 
-        res = session.get(f"{BASE}?listCitiz").json()
+        res = self.session.get(f"{BASE}?listCitiz").json()
         self.citizen_types = {
             d["narration"].upper().strip(): int(d["code"]) for d in res["data"]
         }
@@ -73,7 +73,7 @@ class DataLoader:
             self.reverse_lga = json.loads(cached_reverse)
             return
 
-        res = session.get(f"{BASE}?listCities={self.state_code}").json()
+        res = self.session.get(f"{BASE}?listCities={self.state_code}").json()
         self.lgas = {
             d["cityName"].upper().strip(): int(d["cityCode"]) for d in res["cities"]
         }
@@ -83,7 +83,7 @@ class DataLoader:
         kv.setex("loader:reverse_lga", self.STABLE_TTL, json.dumps(self.reverse_lga))
 
     def _load_wards(self, lga_name, lga_code):
-        return session.get(f"{BASE}?listWard={lga_code}").json()
+        return self.session.get(f"{BASE}?listWard={lga_code}").json()
 
     def load_wards(self):
 
@@ -138,7 +138,9 @@ class DataLoader:
 
         self.facilities = {}
         self.reverse_facility = {}
-        res = session.get(f"{BASE}?getProvidersByWard=0&planid={self.plan_id}").json()
+        res = self.session.get(
+            f"{BASE}?getProvidersByWard=0&planid={self.plan_id}"
+        ).json()
         providers = res["providers"]
 
         for p in providers:
