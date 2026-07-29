@@ -151,14 +151,21 @@ export default function BatchDetails() {
                             ) : (
                                 <div className="divide-y divide-slate-700/40">
                                     {streamQueue.map((f) => (
-                                        <div key={f.id} className="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-700/20 transition-colors">
-                                            <span className="text-slate-300 font-medium">
+                                        <div
+                                            key={f.id}
+                                            onClick={() => navigate(`/enrollment/form/${f.id}`)}
+                                            className="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-700/30 cursor-pointer transition-colors group"
+                                        >
+                                            <span className="text-slate-300 font-medium group-hover:text-white transition-colors">
                                                 {f.surname || f.firstname
                                                     ? `${f.surname || ""} ${f.firstname || ""}`.trim()
                                                     : <span className="text-slate-500 font-mono text-xs">{f.id.slice(0, 8)}</span>
                                                 }
                                             </span>
-                                            <StatusBadgeDark status={f.status} />
+                                            <div className="flex items-center gap-2">
+                                                <StatusBadgeDark status={f.status} />
+                                                <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

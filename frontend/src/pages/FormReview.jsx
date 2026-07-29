@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getForm, updateForm, uploadPassport, rejectForm, enrollForm, getLGAs, getWards, getFacilities, getBatchForms, getCategories } from "../api/enrollment";
 import { useToast } from "../components/ui/Toast";
 import CropModal from "../components/enrollment/CropModal";
-import { ArrowLeft, Upload, Crop, User, Loader2, CheckCircle, AlertTriangle, XCircle, Info } from "lucide-react";
+import ImageViewer from "../components/enrollment/ImageViewer";
+import { ArrowLeft, Upload, Crop, User, Loader2, CheckCircle, AlertTriangle, XCircle, Info, Timer, Trophy, X, BarChart3 } from "lucide-react";
 
 /* ── Required fields (mirrors backend FormUpdater) ── */
 const REQUIRED = new Set([
@@ -15,7 +16,7 @@ const REQUIRED = new Set([
 
 /* ── Field definitions ── */
 const PERSONAL_FIELDS = [
-    { key: "title", label: "Title", type: "select", options: ["Mr", "Mrs", "Miss", "Master", "Chief"], grid: "col-span-1" },
+    { key: "title", label: "Title", type: "select", options: ["Mr.", "Mrs.", "Miss", "Master", "Chief"], grid: "col-span-1" },
     { key: "surname", label: "Surname", grid: "col-span-1" },
     { key: "firstname", label: "First Name", grid: "col-span-1" },
     { key: "othername", label: "Other Name", grid: "col-span-1" },
@@ -69,8 +70,15 @@ export default function FormReview() {
     const [queueIndex, setQueueIndex] = useState(0);
     const [queueHasMore, setQueueHasMore] = useState(true);
     const [reviewComplete, setReviewComplete] = useState(false);
-    const [reviewedCount, setReviewedCount] = useState(0);
     const prefetchingRef = useRef(false);
+
+    // Session stats (gamification)
+    const [sessionStart] = useState(() => Date.now());
+    const [elapsed, setElapsed] = useState(0);
+    const [enrollCount, setEnrollCount] = useState(0);
+    const [rejectCount, setRejectCount] = useState(0);
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+    const [cancelled, setCancelled] = useState(false);
 
     // Form state
     const [currentFormId, setCurrentFormId] = useState(routeFormId || null);
@@ -86,7 +94,14 @@ export default function FormReview() {
     const [cropCoords, setCropCoords] = useState(null);
     const [showCropModal, setShowCropModal] = useState(false);
     const [croppedPreview, setCroppedPreview] = useState(null);
+    const [cachedImgUrl, setCachedImgUrl] = useState(null);
+    const cachedImgUrlRef = useRef(null);
     const passportRef = useRef();
+
+    // Rotation (net clockwise degrees, synced to backend via rotate_angle on enroll)
+    const [rotation, setRotation] = useState(0);
+    const [rotatedImgUrl, setRotatedImgUrl] = useState(null);
+    const rotatedImgUrlRef = useRef(null);
 
     // Reject
     const [showReject, setShowReject] = useState(false);
@@ -139,7 +154,6 @@ export default function FormReview() {
     }, [queueIndex, queue.length, queueHasMore]);
 
     function advanceToNext() {
-        setReviewedCount((c) => c + 1);
         const nextIdx = queueIndex + 1;
         if (nextIdx < queue.length) {
             setQueueIndex(nextIdx);
@@ -148,6 +162,28 @@ export default function FormReview() {
             setReviewComplete(true);
         }
     }
+
+    // ═══════════════ Session timer ═══════════════
+
+    useEffect(() => {
+        if (!isReviewMode || reviewComplete || cancelled) return;
+        const timer = setInterval(() => {
+            setElapsed(Math.floor((Date.now() - sessionStart) / 1000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [isReviewMode, reviewComplete, cancelled, sessionStart]);
+
+    // ═══════════════ Image preloading ═══════════════
+
+    useEffect(() => {
+        if (!queue || queue.length === 0) return;
+        queue.forEach((qf, i) => {
+            if (i > queueIndex && i <= queueIndex + 3) {
+                if (qf.img_path) { const img = new Image(); img.src = qf.img_path; }
+                if (qf.passport_path) { const img = new Image(); img.src = qf.passport_path; }
+            }
+        });
+    }, [queue, queueIndex]);
 
     // ═══════════════ Form loading ═══════════════
 
@@ -183,11 +219,77 @@ export default function FormReview() {
         setCroppedPreview(null);
         setShowCropModal(false);
         setTouched({});
+        if (cachedImgUrlRef.current) URL.revokeObjectURL(cachedImgUrlRef.current);
+        setCachedImgUrl(null);
+        cachedImgUrlRef.current = null;
+        setRotation(0);
+        if (rotatedImgUrlRef.current) URL.revokeObjectURL(rotatedImgUrlRef.current);
+        setRotatedImgUrl(null);
+        rotatedImgUrlRef.current = null;
     }
+
+    // Cache form image as blob URL for reuse (crop modal, left pane)
+    useEffect(() => {
+        if (!form?.img_path) return;
+        let revoked = false;
+        fetch(form.img_path)
+            .then((r) => r.blob())
+            .then((blob) => {
+                if (revoked) return;
+                const url = URL.createObjectURL(blob);
+                setCachedImgUrl(url);
+                cachedImgUrlRef.current = url;
+            })
+            .catch(() => {});
+        return () => { revoked = true; };
+    }, [form?.img_path]);
 
     useEffect(() => {
         if (!isReviewMode && routeFormId) setCurrentFormId(routeFormId);
     }, [routeFormId]);
+
+    // ═══════════════ Rotation ═══════════════
+
+    // Canvas-rotate the cached blob so the pane + CropModal show true rotated
+    // pixels; crop coords drawn on it are in post-rotation space, matching what
+    // the backend stores after applying rotate_angle.
+    useEffect(() => {
+        if (rotatedImgUrlRef.current) {
+            URL.revokeObjectURL(rotatedImgUrlRef.current);
+            rotatedImgUrlRef.current = null;
+        }
+        setRotatedImgUrl(null);
+        if (rotation === 0 || !cachedImgUrl) return;
+        let stale = false;
+        const img = new Image();
+        img.onload = () => {
+            if (stale) return;
+            const swap = rotation === 90 || rotation === 270;
+            const canvas = document.createElement("canvas");
+            canvas.width = swap ? img.naturalHeight : img.naturalWidth;
+            canvas.height = swap ? img.naturalWidth : img.naturalHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+            canvas.toBlob((blob) => {
+                if (stale || !blob) return;
+                const url = URL.createObjectURL(blob);
+                rotatedImgUrlRef.current = url;
+                setRotatedImgUrl(url);
+            }, "image/jpeg", 0.92);
+        };
+        img.src = cachedImgUrl;
+        return () => { stale = true; };
+    }, [rotation, cachedImgUrl]);
+
+    function handleRotate() {
+        const hadCrop = cropCoords && cropCoords.xmax > 0;
+        setRotation((r) => (r + 90) % 360);
+        setCropCoords({ xmin: 0, ymin: 0, xmax: 0, ymax: 0 });
+        setCroppedPreview(null);
+        if (hadCrop) toast.warn("Passport crop cleared — recrop after rotating");
+    }
 
     // ═══════════════ Cascading data ═══════════════
 
@@ -209,7 +311,8 @@ export default function FormReview() {
     // ═══════════════ Crop preview ═══════════════
 
     const generateCropPreview = useCallback(() => {
-        if (!form?.img_path || !cropCoords || cropCoords.xmax <= 0) { setCroppedPreview(null); return; }
+        const src = (rotation !== 0 ? rotatedImgUrl : cachedImgUrl) || form?.img_path;
+        if (!src || !cropCoords || cropCoords.xmax <= 0) { setCroppedPreview(null); return; }
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => {
@@ -222,8 +325,8 @@ export default function FormReview() {
             setCroppedPreview(canvas.toDataURL("image/jpeg", 0.85));
         };
         img.onerror = () => setCroppedPreview(null);
-        img.src = form.img_path;
-    }, [form?.img_path, cropCoords]);
+        img.src = src;
+    }, [rotation, rotatedImgUrl, cachedImgUrl, form?.img_path, cropCoords]);
 
     useEffect(() => {
         if (!passportFile && !useAvatar) generateCropPreview();
@@ -231,11 +334,24 @@ export default function FormReview() {
 
     // ═══════════════ Helpers ═══════════════
 
+    /** MM-DD-YYYY → YYYY-MM-DD (for <input type="date">) */
+    function dobToISO(v) {
+        if (!v) return "";
+        const m = v.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        return m ? `${m[3]}-${m[1]}-${m[2]}` : v;
+    }
+    /** YYYY-MM-DD → MM-DD-YYYY (for backend) */
+    function dobFromISO(v) {
+        if (!v) return "";
+        const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return m ? `${m[2]}-${m[3]}-${m[1]}` : v;
+    }
+
     function unpackForm(d) {
         const kin = d.next_of_kin || {};
         return {
             title: d.title || "", surname: d.surname || "", firstname: d.firstname || "",
-            othername: d.othername || "", dob: d.dob || "", gender: d.gender || "",
+            othername: d.othername || "", dob: dobToISO(d.dob), gender: d.gender || "",
             phone_number: d.phone_number || "", nin: d.nin || "", address: d.address || "",
             marital_status: d.marital_status ?? "", settlement: d.settlement || "",
             occupation: d.occupation || "", category: d.category ?? "",
@@ -297,11 +413,20 @@ export default function FormReview() {
             toast.warn(ninErr || phoneErr);
             return;
         }
+        if (rotation !== 0 && !(cropCoords && cropCoords.xmax > 0) && !passportFile && !useAvatar) {
+            toast.warn("Image was rotated — recrop the passport or upload a photo before enrolling");
+            return;
+        }
 
         setEnrolling(true);
         try {
+            // Passport upload first: the backend's rotate check requires a
+            // passport source to already exist when no fresh crop is sent
+            if (passportFile) await uploadPassport(currentFormId, passportFile);
             const payload = { ...fields };
+            if (payload.dob) payload.dob = dobFromISO(payload.dob);
             if (useAvatar) payload.use_avatar = true;
+            if (rotation !== 0) payload.rotate_angle = rotation;
             if (cropCoords && cropCoords.xmax > 0) {
                 payload.passport_xmin = cropCoords.xmin;
                 payload.passport_ymin = cropCoords.ymin;
@@ -309,16 +434,14 @@ export default function FormReview() {
                 payload.passport_ymax = cropCoords.ymax;
             }
             await updateForm(currentFormId, payload);
-            if (passportFile) await uploadPassport(currentFormId, passportFile);
             const res = await enrollForm(currentFormId);
             if (res.status === "duplicate") {
                 toast.warn(res.msg || "Enrollee already exists");
             } else {
                 toast.success(res.msg || "Enrolled successfully");
             }
-            if (isReviewMode) { advanceToNext(); } else {
-                const updated = await getForm(currentFormId);
-                setForm(updated.data); setFields(unpackForm(updated.data));
+            if (isReviewMode) { setEnrollCount((c) => c + 1); advanceToNext(); } else {
+                loadForm(currentFormId);
             }
         } catch (err) {
             toast.error(err?.msg || "Enrollment failed");
@@ -331,26 +454,44 @@ export default function FormReview() {
             await rejectForm(currentFormId, rejectReason);
             toast.success("Form rejected");
             setShowReject(false);
-            if (isReviewMode) { advanceToNext(); } else {
-                const updated = await getForm(currentFormId);
-                setForm(updated.data); setFields(unpackForm(updated.data));
+            if (isReviewMode) { setRejectCount((c) => c + 1); advanceToNext(); } else {
+                loadForm(currentFormId);
             }
         } catch (err) {
             toast.error(err?.msg || "Reject failed");
         } finally { setRejecting(false); }
     }
 
-    // ═══════════════ Render: Review complete ═══════════════
+    // ═══════════════ Render: Session summary (complete or cancelled) ═══════════════
 
-    if (reviewComplete) {
+    if (reviewComplete || cancelled) {
+        const totalActions = enrollCount + rejectCount;
         return (
-            <div className="h-screen flex items-center justify-center bg-slate-50">
-                <div className="text-center space-y-5 animate-scale-in">
-                    <div className="mx-auto w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
-                        <CheckCircle size={40} className="text-emerald-500" />
+            <div className="h-screen flex items-center justify-center bg-slate-50 p-6">
+                <div className="w-full max-w-md text-center space-y-6 animate-scale-in">
+                    <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center ${cancelled ? "bg-slate-100" : "bg-emerald-50"}`}>
+                        {cancelled
+                            ? <BarChart3 size={38} className="text-slate-400" />
+                            : <Trophy size={38} className="text-emerald-500" />
+                        }
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">Review Complete</h1>
-                    <p className="text-slate-500">You reviewed {reviewedCount} form{reviewedCount !== 1 ? "s" : ""} in this batch.</p>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">{cancelled ? "Session Ended" : "Review Complete"}</h1>
+                        <p className="text-slate-500 mt-2">
+                            {totalActions > 0
+                                ? <>Whew! You reviewed <span className="font-semibold text-slate-700">{totalActions} form{totalActions !== 1 ? "s" : ""}</span> in <span className="font-semibold text-slate-700">{fmtElapsed(elapsed)}</span>.</>
+                                : "No forms were reviewed this session."
+                            }
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-left">
+                        <SummaryStat icon={Timer} label="Time" value={fmtElapsed(elapsed)} tone="slate" />
+                        <SummaryStat icon={BarChart3} label="Avg Pace" value={totalActions > 0 ? fmtPace(elapsed / totalActions) : "—"} tone="slate" />
+                        <SummaryStat icon={CheckCircle} label="Enrolled" value={enrollCount} tone="emerald" />
+                        <SummaryStat icon={XCircle} label="Rejected" value={rejectCount} tone="red" />
+                    </div>
+
                     <button
                         onClick={() => navigate(`/enrollment/batches/${batchId}`)}
                         className="gradient-primary rounded-xl text-white px-8 py-3 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all"
@@ -376,7 +517,8 @@ export default function FormReview() {
         return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-400">Form not found</div>;
     }
 
-    const isTerminal = ["enrolled", "rejected", "failed"].includes(form.status?.toLowerCase());
+    const isLocked = form.status?.toLowerCase() === "enrolled";
+    const displaySrc = rotation !== 0 ? (rotatedImgUrl || cachedImgUrl) : (cachedImgUrl || form.img_path);
     const passportSrc = passportFile
         ? URL.createObjectURL(passportFile)
         : useAvatar
@@ -392,7 +534,10 @@ export default function FormReview() {
             {/* ── Top bar ── */}
             <div className="shrink-0 flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200/80" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
                 <div className="flex items-center gap-3">
-                    <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors">
+                    <button
+                        onClick={() => isReviewMode ? setShowCancelConfirm(true) : navigate(-1)}
+                        className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+                    >
                         <ArrowLeft size={18} className="text-slate-500" />
                     </button>
                     <div>
@@ -402,24 +547,50 @@ export default function FormReview() {
                         <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">{form.status}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-slate-500">
-                    {isReviewMode && (
-                        <span className="gradient-primary text-white px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md shadow-primary-500/20">
-                            {queueIndex + 1} / {queueHasMore ? `${queue.length}+` : queue.length}
-                        </span>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                    {isReviewMode ? (
+                        <>
+                            <span className="flex items-center gap-2 font-mono font-bold text-lg text-slate-800 bg-slate-100 rounded-xl px-4 py-1.5 tabular-nums">
+                                <Timer size={17} className="text-slate-400" />
+                                {fmtElapsed(elapsed)}
+                            </span>
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5 tabular-nums" title="Enrolled this session">
+                                <CheckCircle size={15} /> {enrollCount}
+                            </span>
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5 tabular-nums" title="Rejected this session">
+                                <XCircle size={15} /> {rejectCount}
+                            </span>
+                            {enrollCount + rejectCount > 0 && (
+                                <span className="max-md:hidden font-medium text-slate-400" title="Average pace">
+                                    ~{fmtPace(elapsed / (enrollCount + rejectCount))}
+                                </span>
+                            )}
+                            <span className="gradient-primary text-white px-3.5 py-2 rounded-full text-xs font-bold shadow-md shadow-primary-500/20">
+                                {queueIndex + 1} / {queueHasMore ? `${queue.length}+` : queue.length}
+                            </span>
+                            <button
+                                onClick={() => setShowCancelConfirm(true)}
+                                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all"
+                            >
+                                <X size={13} /> End Session
+                            </button>
+                        </>
+                    ) : (
+                        <span className="font-mono">Seq #{form.sequence}</span>
                     )}
-                    <span className="font-mono">Seq #{form.sequence}</span>
                 </div>
             </div>
 
             {/* ── Two-column layout ── */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left: scanned image */}
-                <div className="w-1/2 bg-slate-900 flex items-center justify-center p-4 overflow-auto shrink-0 max-lg:hidden">
-                    {form.img_path ? (
-                        <img src={form.img_path} alt="Scanned form" className="max-w-full max-h-full object-contain rounded-lg" draggable={false} />
+                <div className="w-1/2 bg-slate-900 shrink-0 max-lg:hidden">
+                    {displaySrc ? (
+                        <ImageViewer key={displaySrc} src={displaySrc} onRotate={!isLocked ? handleRotate : undefined} />
                     ) : (
-                        <p className="text-slate-600">No scan available</p>
+                        <div className="w-full h-full flex items-center justify-center">
+                            <p className="text-slate-600">No scan available</p>
+                        </div>
                     )}
                 </div>
 
@@ -429,8 +600,8 @@ export default function FormReview() {
 
                         {/* Mobile image */}
                         <div className="lg:hidden rounded-xl overflow-hidden bg-slate-900 max-h-56 flex items-center justify-center">
-                            {form.img_path
-                                ? <img src={form.img_path} alt="Scanned form" className="max-w-full max-h-56 object-contain" />
+                            {displaySrc
+                                ? <img src={displaySrc} alt="Scanned form" className="max-w-full max-h-56 object-contain" />
                                 : <p className="text-slate-600 py-10">No scan available</p>
                             }
                         </div>
@@ -452,13 +623,13 @@ export default function FormReview() {
                                     <input ref={passportRef} type="file" accept="image/*" className="hidden"
                                         onChange={(e) => { if (e.target.files[0]) { setPassportFile(e.target.files[0]); setUseAvatar(false); } }}
                                     />
-                                    <button type="button" onClick={() => passportRef.current.click()} disabled={isTerminal}
+                                    <button type="button" onClick={() => passportRef.current.click()} disabled={isLocked}
                                         className="gradient-primary text-white rounded-xl px-5 py-2 text-xs font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all disabled:opacity-40 flex items-center gap-1.5">
                                         <Upload size={13} /> Upload
                                     </button>
-                                    <button type="button" disabled={isTerminal}
+                                    <button type="button" disabled={isLocked}
                                         onClick={() => {
-                                            if (!cropCoords || cropCoords.xmax <= 0) { toast.warn("No crop coordinates available. Upload a photo instead."); return; }
+                                            if (rotation !== 0 && !rotatedImgUrl) { toast.warn("Preparing rotated image, try again in a moment"); return; }
                                             setShowCropModal(true);
                                         }}
                                         className="bg-slate-100 text-slate-700 rounded-xl px-5 py-2 text-xs font-semibold hover:bg-slate-200 transition-all disabled:opacity-40 flex items-center gap-1.5 border border-slate-200">
@@ -466,7 +637,7 @@ export default function FormReview() {
                                     </button>
                                 </div>
                                 <label className="flex items-center gap-2 text-xs text-slate-500 mt-3 cursor-pointer select-none">
-                                    <input type="checkbox" checked={useAvatar} disabled={isTerminal}
+                                    <input type="checkbox" checked={useAvatar} disabled={isLocked}
                                         onChange={(e) => { setUseAvatar(e.target.checked); if (e.target.checked) setPassportFile(null); }}
                                         className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
                                     Use default avatar
@@ -480,7 +651,7 @@ export default function FormReview() {
                                 {PERSONAL_FIELDS.map((f) => (
                                     <div key={f.key} className={f.grid}>
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
-                                            disabled={isTerminal} required={REQUIRED.has(f.key)}
+                                            disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
                                             error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
                                         />
@@ -495,7 +666,7 @@ export default function FormReview() {
                                 {LOCATION_FIELDS.map((f) => (
                                     <div key={f.key} className={f.grid}>
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
-                                            disabled={isTerminal} required={REQUIRED.has(f.key)}
+                                            disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
                                         />
                                     </div>
@@ -509,7 +680,7 @@ export default function FormReview() {
                                 {KIN_FIELDS.map((f) => (
                                     <div key={f.key} className={f.grid}>
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
-                                            disabled={isTerminal} required={REQUIRED.has(f.key)}
+                                            disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
                                         />
                                     </div>
@@ -518,7 +689,7 @@ export default function FormReview() {
                         </Section>
 
                         {/* ── Actions ── */}
-                        {!isTerminal && (
+                        {!isLocked && (
                             <div className="sticky bottom-0 bg-white pt-4 pb-6 space-y-4" style={{ boxShadow: "0 -4px 16px rgba(0,0,0,0.04)" }}>
                                 <div className="flex gap-3">
                                     {!showReject ? (
@@ -549,7 +720,7 @@ export default function FormReview() {
                             </div>
                         )}
 
-                        {isTerminal && !isReviewMode && (
+                        {isLocked && !isReviewMode && (
                             <div className="text-center text-sm text-slate-500 py-6 border-t border-slate-100">
                                 This form has been <span className="font-semibold">{form.status?.toLowerCase()}</span>.
                                 {form.enrollee_number && <p className="mt-1 font-mono text-xs text-primary-600">Enrollee ID: {form.enrollee_number}</p>}
@@ -560,9 +731,78 @@ export default function FormReview() {
             </div>
 
             {showCropModal && (
-                <CropModal imgSrc={form.img_path} initialCoords={cropCoords}
+                <CropModal imgSrc={displaySrc} initialCoords={cropCoords}
                     onApply={handleCropApply} onClose={() => setShowCropModal(false)} />
             )}
+
+            {showCancelConfirm && (
+                <div
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowCancelConfirm(false); }}
+                >
+                    <div className="card w-full max-w-sm p-6 text-center space-y-4 animate-scale-in" style={{ boxShadow: "var(--shadow-elevated)" }}>
+                        <div className="mx-auto w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+                            <AlertTriangle size={26} className="text-amber-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">End review session?</h2>
+                            <p className="text-sm text-slate-500 mt-1.5">
+                                You've reviewed {enrollCount + rejectCount} form{enrollCount + rejectCount !== 1 ? "s" : ""} in {fmtElapsed(elapsed)}.
+                                Your progress is saved — remaining forms stay in the queue.
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowCancelConfirm(false)}
+                                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                            >
+                                Keep Reviewing
+                            </button>
+                            <button
+                                onClick={() => { setShowCancelConfirm(false); setCancelled(true); }}
+                                className="flex-1 rounded-xl bg-red-600 text-white py-2.5 text-sm font-semibold hover:bg-red-700 transition-colors"
+                            >
+                                End Session
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ── Session stat helpers ── */
+function fmtElapsed(totalSec) {
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return h > 0
+        ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+        : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function fmtPace(secPerForm) {
+    return secPerForm >= 60
+        ? `${(secPerForm / 60).toFixed(1)} min/form`
+        : `${Math.round(secPerForm)}s/form`;
+}
+
+const SUMMARY_TONES = {
+    slate: { bg: "bg-slate-50", icon: "text-slate-400", value: "text-slate-800" },
+    emerald: { bg: "bg-emerald-50", icon: "text-emerald-500", value: "text-emerald-700" },
+    red: { bg: "bg-red-50", icon: "text-red-500", value: "text-red-700" },
+};
+
+function SummaryStat({ icon: Icon, label, value, tone }) {
+    const t = SUMMARY_TONES[tone] || SUMMARY_TONES.slate;
+    return (
+        <div className={`rounded-xl p-4 ${t.bg}`}>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <Icon size={13} className={t.icon} />
+                {label}
+            </div>
+            <p className={`text-xl font-bold mt-1 ${t.value}`}>{value}</p>
         </div>
     );
 }
@@ -594,13 +834,13 @@ function getFlagBanner(form) {
             </div>
         );
     }
-    if (status === "rejected" && form.reject_reason) {
+    if (status === "rejected" && form.reason) {
         return (
             <div className="flex items-start gap-3 rounded-xl p-4 text-sm bg-slate-100 border border-slate-200 text-slate-600 animate-fade-in">
                 <Info size={18} className="shrink-0 mt-0.5" />
                 <div>
                     <p className="font-semibold">Rejected</p>
-                    <p className="mt-1 text-xs opacity-80">{form.reject_reason}</p>
+                    <p className="mt-1 text-xs opacity-80">{form.reason}</p>
                 </div>
             </div>
         );

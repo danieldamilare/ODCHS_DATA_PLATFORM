@@ -120,9 +120,9 @@ export default function Enrollment() {
             {showUpload && (
                 <UploadModal
                     onClose={() => setShowUpload(false)}
-                    onBatchCreated={() => {
+                    onBatchCreated={(batch) => {
                         setShowUpload(false);
-                        refreshBatches(page);
+                        navigate(`/enrollment/batches/${batch.id}`);
                     }}
                 />
             )}

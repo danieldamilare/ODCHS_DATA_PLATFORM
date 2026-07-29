@@ -15,8 +15,10 @@ export default defineConfig({
                 changeOrigin: true,
                 secure: false,
                 ws: true,
-            }
-        }
+            },
+
+        },
+        allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
     },
     optimizeDeps: {
         // This stops Vite and Rolldown from crawling into Tailwind's Rust binary extensions
