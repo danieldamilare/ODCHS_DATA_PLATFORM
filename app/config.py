@@ -37,6 +37,8 @@ class Config:
     }
 
     broker_url = REDIS_URL
+    task_acks_late = True
+    worker_reject_on_worker_lost = True
 
     broker_transport_options = {"visibility_timeout": 18000}
 

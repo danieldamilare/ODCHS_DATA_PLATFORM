@@ -166,7 +166,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
     form: Optional[Form] = db.session.scalar(
         sa.select(Form).where(Form.uuid == form_id)
     )
-    if not form:
+    if not form or form.status != FormStatus.PENDING:
         return
 
     batch = form.batch

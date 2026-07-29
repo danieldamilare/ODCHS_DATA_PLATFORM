@@ -16,7 +16,7 @@ pydantic==2.13.4
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 
-opencv-python==5.0.0.93
+opencv-python-headless
 pytesseract==0.3.13
 deepface==0.0.100
 pillow==12.3.0
