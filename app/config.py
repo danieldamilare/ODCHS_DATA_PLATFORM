@@ -6,7 +6,7 @@ class Config:
     # 500 MB maximum threshold to handle massive field agent ZIP files safely
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    SECRET_KEY = os.getenv("SECRET_KEY")
 
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL") or "sqlite:///" + os.path.join(
         BASE_DIR, "app.db"
