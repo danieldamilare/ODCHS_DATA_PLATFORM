@@ -1,0 +1,12 @@
+venv/
+.env
+.flaskenv
+__pycache__/
+*.pyc
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+*.db
