@@ -1,6 +1,17 @@
 import cv2
 import pytesseract
-import re
+import os
+
+
+YUNET_MODEL_PATH = os.path.join(
+    os.path.dirname(__file__), "face_detection_yunet_2026may.onnx"
+)
+
+if not os.path.exists(YUNET_MODEL_PATH):
+    raise FileNotFoundError(
+        f"YuNet ONNX architecture file missing at expected location: {YUNET_MODEL_PATH}. "
+        "Ensure the model file is committed to Git and pulled into this directory."
+    )
 
 
 def read_image(image_path_or_matrix):
@@ -25,7 +36,7 @@ def rotate_image(img_path, angle: int):
     cv2.imwrite(img_path, img)
 
 
-def downscale_image(img, target_width=1000):
+def downscale_image(img, target_width=1200):
     h_img, w_img = img.shape[:2]
     if w_img <= target_width:
         return img, 1.0
@@ -88,38 +99,47 @@ def correct_form_orentation(img_path_or_matrix, logger=None):
 
 
 def extract_full_passport_with_backend(img_path_or_matrix, margin=0.27, logger=None):
-    from deepface import DeepFace
-
+    print("About to start reading image")
     img = read_image(img_path_or_matrix)
     h_img, w_img = img.shape[:2]
     img_low_res, scale_factor = downscale_image(img)
+    print("downscaled image")
+    h_low, w_low = img_low_res.shape[:2]
 
     try:
-        face = DeepFace.extract_faces(img_low_res, detector_backend="retinaface")
+        detector = cv2.FaceDetectorYN.create(
+            model=YUNET_MODEL_PATH,
+            config="",
+            input_size=(w_low, h_low),
+            score_threshold=0.40,
+            nms_threshold=0.20,
+        )
+        retval, faces = detector.detect(img_low_res)
+
+        if faces is None or len(faces) == 0:
+            raise ValueError("No faces detected by YuNet.")
+        face_area = faces[0]
+
+        x, y, w, h = (
+            int(face_area[0] / scale_factor),
+            int(face_area[1] / scale_factor),
+            int(face_area[2] / scale_factor),
+            int(face_area[3] / scale_factor),
+        )
+        pad_w = int(w * margin)
+        pad_h = int(h * margin)
+
+        x1 = max(0, x - pad_w)
+        y1 = max(0, y - int(pad_h * 1.2))
+        x2 = min(w_img, x + w + pad_w)
+        y2 = min(h_img, y + h + int(pad_h * 1.0))
+        return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
+
     except Exception as e:
+        print(e)
+        print("caught an exception", e)
         if logger:
             logger.info(
                 f"Error extracting passport with retinaface: {e}. Trying fallback..."
             )
-        # let's user of the utility handles exception. No fall here
-        try:
-            face = DeepFace.extract_faces(img_low_res)
-        except Exception as e:
-            # if we reach here, then probably the form has no passport
-            return {"x1": -1, "x2": -1, "y1": -1, "y2": -1}
-
-    face_area = face[0]["facial_area"]
-    x, y, w, h = (
-        int(face_area["x"] / scale_factor),
-        int(face_area["y"] / scale_factor),
-        int(face_area["w"] / scale_factor),
-        int(face_area["h"] / scale_factor),
-    )
-    pad_w = int(w * margin)
-    pad_h = int(h * margin)
-
-    x1 = max(0, x - pad_w)
-    y1 = max(0, y - int(pad_h * 1.2))
-    x2 = min(w_img, x + w + pad_w)
-    y2 = min(h_img, y + h + int(pad_h * 1.0))
-    return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
+        return {"x1": -1, "x2": -1, "y1": -1, "y2": -1}

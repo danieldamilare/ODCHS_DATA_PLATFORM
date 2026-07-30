@@ -23,6 +23,7 @@ from flask import current_app
 from app.enrollment.llm.clients import AllKeysExhausted, gemini_client
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from celery import group
+from time import perf_counter
 import cv2
 
 
@@ -137,23 +138,35 @@ def llm_extract(img_path):
 
 
 def _process_image_pipeline(form: Form, batch: Batch):
+    t0 = perf_counter()
     image_matrix = read_image(form.img_path)
+    print(f"read_image: {perf_counter() - t0:.3f}s")
+
+    t0 = perf_counter()
     if is_image_too_blurry(image_matrix):
         form.status = FormStatus.NEED_RESCAN
         form.reason = "Image is too blurry. Please rescan"
         db.session.commit()
         return
+    print(f"blur: {perf_counter() - t0:.3f}s")
 
+    t0 = perf_counter()
     correct_form = correct_form_orentation(image_matrix)
+    print(f"orientation: {perf_counter() - t0:.3f}s")
+
     desc, path = tempfile.mkstemp(suffix=os.path.splitext(form.img_path)[1])
     os.close(desc)
     cv2.imwrite(path, correct_form)
     os.replace(path, form.img_path)
 
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = executor.submit(llm_extract, form.img_path)
-        coords = extract_full_passport_with_backend(correct_form)
-        res = futures.result()
+    t0 = perf_counter()
+    coords = extract_full_passport_with_backend(correct_form)
+    print(f"yunet: {perf_counter() - t0:.3f}s")
+
+    t0 = perf_counter()
+    res = llm_extract(form.img_path)
+    print(f"gemini: {perf_counter() - t0:.3f}s")
+
     form = normalize_form_object(form, batch, res, coords)
     form.status = FormStatus.READY
 
@@ -179,6 +192,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
             _finalize_image_processing(batch_name, batch_id, form)
 
     except AllKeysExhausted as e:
+        countdown = min(45 * (self.request.retries + 1), 5 * 60)
         raise self.retry(countdown=15 * 60)
 
     except Exception as e:
