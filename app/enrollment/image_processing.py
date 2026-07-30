@@ -1,5 +1,4 @@
 import cv2
-import pytesseract
 import os
 
 
@@ -61,85 +60,77 @@ def is_image_too_blurry(image_path_or_matrix, threshold=200.0, logger=None):
     return False
 
 
-def correct_form_orentation(img_path_or_matrix, logger=None):
-    img = read_image(img_path_or_matrix)
-    try:
-        osd_data = pytesseract.image_to_osd(
-            img, config="--psm 0", output_type=pytesseract.Output.DICT
-        )
+def generate_crop_dimension_from_face(face_area, scale_factor, margin, h_img, w_img):
+    x, y, w, h = (
+        int(face_area[0] / scale_factor),
+        int(face_area[1] / scale_factor),
+        int(face_area[2] / scale_factor),
+        int(face_area[3] / scale_factor),
+    )
+    pad_w = int(w * margin)
+    pad_h = int(h * margin)
 
-        rotation = int(osd_data.get("rotate", 0))
-        confidence = float(osd_data.get("orientation_conf", 0.0))
-
-        if logger:
-            logger.info(
-                f"OSD Results -> Rotation: {rotation}°, Confidence: {confidence}"
-            )
-
-        if confidence < 2.0:
-            if logger:
-                logger.info(
-                    "OSD confidence too low. Skipping rotation to avoid false positives."
-                )
-            return img
-
-        if rotation == 90:
-            img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-        elif rotation == 180:
-            img = cv2.rotate(img, cv2.ROTATE_180)
-        elif rotation == 270:
-            img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-        return img
-
-    except Exception as e:
-        if logger:
-            logger.info(f"Rotation failed for img: {e}")
-        return img
+    x1 = max(0, x - pad_w)
+    y1 = max(0, y - int(pad_h * 1.2))
+    x2 = min(w_img, x + w + pad_w)
+    y2 = min(h_img, y + h + int(pad_h * 1.2))
+    return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
 
 
-def extract_full_passport_with_backend(img_path_or_matrix, margin=0.27, logger=None):
+def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=None):
     print("About to start reading image")
+
     img = read_image(img_path_or_matrix)
+    original_image = img
     h_img, w_img = img.shape[:2]
-    img_low_res, scale_factor = downscale_image(img)
-    print("downscaled image")
-    h_low, w_low = img_low_res.shape[:2]
 
-    try:
-        detector = cv2.FaceDetectorYN.create(
-            model=YUNET_MODEL_PATH,
-            config="",
-            input_size=(w_low, h_low),
-            score_threshold=0.40,
-            nms_threshold=0.20,
-        )
-        retval, faces = detector.detect(img_low_res)
+    wrong_dimension = w_img > h_img
 
-        if faces is None or len(faces) == 0:
-            raise ValueError("No faces detected by YuNet.")
-        face_area = faces[0]
+    img_approx = []  # guilty until proven innocent
+    if wrong_dimension:
+        img_approx.append(cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE))
+        img_approx.append(cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE))
+    else:
+        img_approx.append(img)
+        img_approx.append(cv2.rotate(img, cv2.ROTATE_180))
 
-        x, y, w, h = (
-            int(face_area[0] / scale_factor),
-            int(face_area[1] / scale_factor),
-            int(face_area[2] / scale_factor),
-            int(face_area[3] / scale_factor),
-        )
-        pad_w = int(w * margin)
-        pad_h = int(h * margin)
+    detector = cv2.FaceDetectorYN.create(
+        model=YUNET_MODEL_PATH,
+        config="",
+        input_size=(0, 0),
+        score_threshold=0.40,
+        nms_threshold=0.20,
+    )
 
-        x1 = max(0, x - pad_w)
-        y1 = max(0, y - int(pad_h * 1.2))
-        x2 = min(w_img, x + w + pad_w)
-        y2 = min(h_img, y + h + int(pad_h * 1.0))
-        return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
+    for img in img_approx:
 
-    except Exception as e:
-        print(e)
-        print("caught an exception", e)
-        if logger:
-            logger.info(
-                f"Error extracting passport with retinaface: {e}. Trying fallback..."
+        img_low_res, scale_factor = downscale_image(img)
+        print("downscaled image")
+        h_low, w_low = img_low_res.shape[:2]
+        detector.setInputSize((w_low, h_low))
+        h, w = img.shape[:2]
+        try:
+            _, faces = detector.detect(img_low_res)
+
+            if faces is None or len(faces) == 0:
+                continue
+            face_area = faces[0]
+            result = generate_crop_dimension_from_face(
+                face_area, scale_factor, margin, h, w
             )
-        return {"x1": -1, "x2": -1, "y1": -1, "y2": -1}
+            if (result["y2"] + result["y1"]) / 2 < h * 0.45:
+                return img, result
+        except Exception as e:
+            if logger:
+                logger.info(f"Encounter error on image: {e}")
+            continue
+    if logger:
+        logger.info(
+            f"Error extracting passport: returning a negative coordinatine for error"
+        )
+    return original_image, {
+        "x1": -1,
+        "x2": -1,
+        "y1": -1,
+        "y2": -1,
+    }  # Give up and return the first image (original if the image wasn't slanted in rotation)

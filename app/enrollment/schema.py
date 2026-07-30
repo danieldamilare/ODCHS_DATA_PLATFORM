@@ -34,7 +34,7 @@ class OCRResponse(BaseModel):
     dob: str = Field(default="", description="Format: MM-DD-YYYY")
     marital_status: Optional[MaritalStatusEnum] = None
     address: str = ""
-    gender: Optional[Gender]
+    gender: Optional[Gender] = None
     phone_number: str = ""
     nin: str = ""
     next_of_kin: Optional[NextOfKin] = None

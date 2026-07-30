@@ -12,8 +12,7 @@ from app import celery_app, kv, db
 from app.enrollment.image_processing import (
     is_image_too_blurry,
     read_image,
-    correct_form_orentation,
-    extract_full_passport_with_backend,
+    process_form_orientation_and_crop,
 )
 from app.enrollment.utils import is_image_extension
 from app.enrollment.models import Form, FormStatus, BatchStatus, Batch
@@ -151,17 +150,13 @@ def _process_image_pipeline(form: Form, batch: Batch):
     print(f"blur: {perf_counter() - t0:.3f}s")
 
     t0 = perf_counter()
-    correct_form = correct_form_orentation(image_matrix)
-    print(f"orientation: {perf_counter() - t0:.3f}s")
+    correct_form, coords = process_form_orientation_and_crop(image_matrix)
+    print(f"yunet crop and orientation correction: {perf_counter() - t0:.3f}s")
 
     desc, path = tempfile.mkstemp(suffix=os.path.splitext(form.img_path)[1])
     os.close(desc)
     cv2.imwrite(path, correct_form)
     os.replace(path, form.img_path)
-
-    t0 = perf_counter()
-    coords = extract_full_passport_with_backend(correct_form)
-    print(f"yunet: {perf_counter() - t0:.3f}s")
 
     t0 = perf_counter()
     res = llm_extract(form.img_path)

@@ -69,12 +69,13 @@ def normalize_form_object(
     form.firstname = res.first_name
     form.othername = res.other_name
 
-    form.kin_firstname = res.next_of_kin.first_name
-    form.kin_othername = res.next_of_kin.other_name
-    form.kin_relationship = res.next_of_kin.relationship
-    form.kin_address = res.next_of_kin.address
-    form.kin_phone_number = normalize_ng_phone(res.next_of_kin.phone_number)
-    form.kin_surname = res.next_of_kin.surname
+    if res.next_of_kin:
+        form.kin_firstname = res.next_of_kin.first_name
+        form.kin_othername = res.next_of_kin.other_name
+        form.kin_relationship = res.next_of_kin.relationship
+        form.kin_address = res.next_of_kin.address
+        form.kin_phone_number = normalize_ng_phone(res.next_of_kin.phone_number)
+        form.kin_surname = res.next_of_kin.surname
 
     title = process_title(
         form.gender, res.marital_status.value if res.marital_status else ""
