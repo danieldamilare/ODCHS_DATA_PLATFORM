@@ -78,7 +78,7 @@ def generate_crop_dimension_from_face(face_area, scale_factor, margin, h_img, w_
 
 
 def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=None):
-    print("About to start reading image")
+    logger.info("About to start reading image")
 
     img = read_image(img_path_or_matrix)
     original_image = img
@@ -105,7 +105,7 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
     for img in img_approx:
 
         img_low_res, scale_factor = downscale_image(img)
-        print("downscaled image")
+        logger.info("downscaled image")
         h_low, w_low = img_low_res.shape[:2]
         detector.setInputSize((w_low, h_low))
         h, w = img.shape[:2]

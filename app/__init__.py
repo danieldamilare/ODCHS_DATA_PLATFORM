@@ -4,6 +4,8 @@ from flask_sqlalchemy import SQLAlchemy
 from celery import Celery, Task
 from redis import Redis
 
+from app.logger import logger
+
 db = SQLAlchemy()
 kv = None
 celery_app = Celery(__name__)
@@ -31,3 +33,4 @@ def create_app(config=Config):
 
 
 app = create_app()
+logger.info("Flask application started")

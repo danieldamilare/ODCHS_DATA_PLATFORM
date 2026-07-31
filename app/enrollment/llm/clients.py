@@ -1,6 +1,7 @@
 from app.enrollment.llm.keys import get_key, release_key
 from app.enrollment.llm.prompt import SYSTEM_PROMPT
 from app.enrollment.schema import OCRResponse
+from app.logger import logger as w_logger
 from flask import current_app
 from google import genai
 from time import perf_counter
@@ -42,7 +43,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
 
     while attempt <= max_retries:
         current_api_key = get_key()
-        print("Gemini successfully acquired key: ", current_api_key)
+        w_logger.info("Gemini successfully acquired key: ", current_api_key)
 
         if current_api_key is None:
             raise AllKeysExhausted()
@@ -54,7 +55,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
             client = genai.Client(api_key=current_api_key)
             t0 = perf_counter()
             uploaded_file = client.files.upload(file=image_path)
-            print(f"Upload file time: {perf_counter() - t0:.3f}s")
+            w_logger.debug(f"Upload file time: {perf_counter() - t0:.3f}s")
             t0 = perf_counter()
             response = client.interactions.create(
                 model=MODEL_NAME,
@@ -73,8 +74,8 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
                     },
                 ],
             )
-            print(f"Interaction time  time: {perf_counter() - t0:.3f}s")
-            print("Gemini sent response text: ", response.output_text)
+            w_logger.debug(f"Interaction time  time: {perf_counter() - t0:.3f}s")
+            w_logger.debug("Gemini sent response text: ", response.output_text)
 
             release_key(
                 current_api_key, to_cool=True, cooldown_time=SUCCESS_COOLDOWN_SECONDS
@@ -84,14 +85,14 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
             try:
                 return OCRResponse.model_validate_json(response.output_text)
             except (ValidationError, json.JSONDecodeError) as e:
-                print(f"OCR schema validation failed: {e}")
+                w_logger.error(f"OCR schema validation failed: {e}")
                 last_error = e
                 attempt += 1
                 time.sleep(1)
                 continue
 
         except RateLimitError as e:
-            print(f"Rate limit hit, cooling key: {e}")
+            w_logger.error(f"Rate limit hit, cooling key: {e}")
             last_error = e
             try:
                 body = (
@@ -99,10 +100,10 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
                     or getattr(e, "body", None)
                     or getattr(e, "args", None)
                 )
-                print(f"RAW 429 BODY: {body!r}")
-                print(f"RAW 429 ATTRS: {vars(e)!r}")
+                w_logger.error(f"RAW 429 BODY: {body!r}")
+                w_logger.error(f"RAW 429 ATTRS: {vars(e)!r}")
             except Exception as inspect_err:
-                print(f"Could not introspect error: {inspect_err}")
+                w_logger.error(f"Could not introspect error: {inspect_err}")
             release_key(
                 current_api_key,
                 to_cool=True,
@@ -114,7 +115,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
 
         except APIStatusError as e:
             status_code = getattr(e, "status_code", None) or getattr(e, "code", None)
-            print(f"Gemini API status error encountered (status={status_code}): {e}")
+            w_logger.error(f"Gemini API status error encountered (status={status_code}): {e}")
             last_error = e
 
             if status_code is not None and 500 <= int(status_code) < 600:
@@ -137,7 +138,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
                 raise
 
         except APIError as e:
-            print(f"Gemini API error encountered: {e}")
+            w_logger.error(f"Gemini API error encountered: {e}")
             last_error = e
             release_key(
                 current_api_key, to_cool=True, cooldown_time=TRANSIENT_COOLDOWN_SECONDS
@@ -148,7 +149,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
             continue
 
         except (httpx.TimeoutException, httpx.NetworkError) as e:
-            print(f"Network transport error encountered: {e}")
+            w_logger.error(f"Network transport error encountered: {e}")
             last_error = e
             release_key(
                 current_api_key, to_cool=True, cooldown_time=TRANSIENT_COOLDOWN_SECONDS
@@ -159,7 +160,7 @@ def gemini_client(image_path: str, logger=None, max_retries=4) -> OCRResponse:
             continue
 
         except Exception as e:
-            print(f"Generic Error, all catch for {e}")
+            w_logger.error(f"Generic Error, all catch for {e}")
             traceback.print_exc()
             last_error = e
             release_key(

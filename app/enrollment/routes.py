@@ -236,7 +236,7 @@ def get_batch_progress_stream(batch_id: str):
 
             while True:
                 message = subscriber.get_message(timeout=15)
-                print(f"got message: {message}")
+                logger.debug(f"got message: {message}")
                 if message is None:
                     yield ": heartbeat\n\n"
 

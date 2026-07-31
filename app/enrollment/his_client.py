@@ -3,6 +3,8 @@ import time
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
 
+from app.logger import logger
+
 BASE = "https://odchc-his.org/administrator/functions"
 
 
@@ -14,7 +16,7 @@ class HisEnrolleeResult:
 
 
 def create_enrolle(data: Dict):
-    print("Creating enrollee in create_enrollee")
+    logger.info("Creating enrollee in create_enrollee")
 
     json_form = {
         "cooperateCode": "",
@@ -145,7 +147,7 @@ def create_enrolle(data: Dict):
     url = f"{BASE}?createEnrollee"
     session = get_his_session()
     res = session.post(url, json=json_form, timeout=40)
-    print("Gotten message from server", res.text)
+    logger.info("Gotten message from server", res.text)
 
     if res.status_code != 200:
         return HisEnrolleeResult(
