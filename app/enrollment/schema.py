@@ -39,6 +39,15 @@ class OCRResponse(BaseModel):
     nin: str = ""
     next_of_kin: Optional[NextOfKin] = None
 
+    @field_validator("surname", "first_name", "other_name", mode="after")
+    @classmethod
+    def reject_absurd_length(cls, v):
+        if v and len(v) > 50:
+            raise ValueError(
+                f"Field value implausibly long ({len(v)} chars) — likely extraction failure"
+            )
+        return v
+
 
 class BatchUploader(BaseModel):
     batch_file: FileStorage
