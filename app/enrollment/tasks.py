@@ -19,6 +19,7 @@ from app.enrollment.models import Form, FormStatus, BatchStatus, Batch
 from app.enrollment.normalization import normalize_form_object
 
 from flask import current_app
+from app.logger import logger
 from app.enrollment.llm.clients import AllKeysExhausted, gemini_client
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from celery import group
@@ -31,7 +32,7 @@ def extract_zip_for_processing(path: str, batch_id: str):
     kv_batch_name = f"batch:{batch_id}"
 
     batch = db.session.scalar(sa.select(Batch).where(Batch.uuid == batch_id))
-    print("Got batch", batch)
+    logger.info("Got batch", batch)
     if not batch:
         kv.hset(kv_batch_name, mapping={"status": "FAILED", "msg": "Batch not found"})
         return
@@ -75,7 +76,7 @@ def extract_zip_for_processing(path: str, batch_id: str):
                     sequence=idx + 1,
                     status=FormStatus.PENDING,
                 )
-                print("Created new form: ", new_form)
+                logger.info("Created new form: ", new_form)
                 db.session.add(new_form)
 
                 form_uuids.append(str(new_form.uuid))
@@ -139,7 +140,7 @@ def llm_extract(img_path):
 def _process_image_pipeline(form: Form, batch: Batch):
     t0 = perf_counter()
     image_matrix = read_image(form.img_path)
-    print(f"read_image: {perf_counter() - t0:.3f}s")
+    logger.debug(f"read_image: {perf_counter() - t0:.3f}s")
 
     t0 = perf_counter()
     if is_image_too_blurry(image_matrix):
@@ -147,11 +148,11 @@ def _process_image_pipeline(form: Form, batch: Batch):
         form.reason = "Image is too blurry. Please rescan"
         db.session.commit()
         return
-    print(f"blur: {perf_counter() - t0:.3f}s")
+    logger.debug(f"blur: {perf_counter() - t0:.3f}s")
 
     t0 = perf_counter()
     correct_form, coords = process_form_orientation_and_crop(image_matrix)
-    print(f"yunet crop and orientation correction: {perf_counter() - t0:.3f}s")
+    logger.debug(f"yunet crop and orientation correction: {perf_counter() - t0:.3f}s")
 
     desc, path = tempfile.mkstemp(suffix=os.path.splitext(form.img_path)[1])
     os.close(desc)
@@ -160,7 +161,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
 
     t0 = perf_counter()
     res = llm_extract(form.img_path)
-    print(f"gemini: {perf_counter() - t0:.3f}s")
+    logger.info(f"gemini: {perf_counter() - t0:.3f}s")
 
     form = normalize_form_object(form, batch, res, coords)
     form.status = FormStatus.READY

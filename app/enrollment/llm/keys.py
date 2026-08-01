@@ -1,6 +1,7 @@
 import os
 from app import kv
 import hashlib
+from app.logger import logger
 
 KEY_POOL = "gemini:api_keys"
 LEASE = "gemini:lease"
@@ -21,7 +22,7 @@ def is_cooling(api_key: str):
 
 def load_api_keys():
     t = os.getenv("TOTAL_KEY")
-    print("Got total key", t)
+    logger.info("Got total key", t)
     if not t:
         return
     total = int(t) + 1

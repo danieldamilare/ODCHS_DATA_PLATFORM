@@ -1,4 +1,7 @@
 venv/
+forms/
+logs/
+
 .env
 .flaskenv
 __pycache__/
