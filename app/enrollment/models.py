@@ -20,6 +20,7 @@ class FormStatus(Enum):
     REJECTED = "rejected"  # Explicitly marked bad by human validator
     NEED_RESCAN = "need_rescan"
     ERROR = "error"  # Local extraction or processing pipeline error
+    ALREADY_EXIST = "already_exist"
 
 
 class Batch(db.Model):
@@ -89,7 +90,7 @@ class Form(db.Model):
     }
 
     id = db.Column(db.Integer, primary_key=True)
-    sequence = db.Column(db.Integer)
+    sequence = db.Column(db.Integer, index=True)
     uuid = db.Column(db.String, unique=True, default=lambda: str(uuid_tool.uuid4()))
     img_path = db.Column(db.Text, nullable=False)
     passport_path = db.Column(db.Text, nullable=True)
@@ -105,9 +106,9 @@ class Form(db.Model):
     category = db.Column(db.Integer, nullable=True)
     marital_status = db.Column(db.String(15), nullable=True)
 
-    batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False)
+    batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False, index=True)
     # enrollee_number is returned from the HIS, useful if we add ID card generation
-    enrollee_number = db.Column(db.String, nullable=True)
+    enrollee_number = db.Column(db.String, nullable=True, index=True)
     genotype = db.Column(db.String(3), nullable=True)
     medical_history = db.Column(db.Text, nullable=True)
 

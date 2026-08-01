@@ -1,22 +1,128 @@
+
 from app.enrollment.session import get_his_session
-import time
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any
 from dataclasses import dataclass
+import json
+import requests
+from requests.models import PreparedRequest
+from tenacity import retry, stop_after_attempt, retry_if_exception_type, wait_exponential
+from enum import Enum, auto
 
 BASE = "https://odchc-his.org/administrator/functions"
 
-
 @dataclass
-class HisEnrolleeResult:
+class HISIdCardResult:
     success: bool
     msg: str
-    payload: Optional[Dict]
+    payload: Optional[Dict] = None
+
+class HISEnrollStatus(Enum):
+    CREATED = auto()
+    ALREADY_EXISTS = auto()
+    FAILED = auto()
+
+@dataclass
+class HISEnrollResult:
+    status: HISEnrollStatus
+    message: str
+    payload: dict | None = None
+
+    @property
+    def success(self):
+        return self.status in (
+            HISEnrollStatus.CREATED,
+            HISEnrollStatus.ALREADY_EXISTS,
+        )
 
 
-def create_enrolle(data: Dict):
-    print("Creating enrollee in create_enrollee")
+class HISClient:
+    def __init__(self, base_url = BASE):
+        self.session = get_his_session()
+        self.base_url = base_url
 
-    json_form = {
+    @retry(stop=stop_after_attempt(4), 
+           wait=wait_exponential(1, 3, 10),
+           retry=retry_if_exception_type(IOError),
+           reraise=True
+           )
+    def _execute_post(self, endpoint: str, json_data: Optional[Dict] = None, raw_data: Optional[str] = None) -> Dict[str, Any]:
+        url = f"{self.base_url}?{endpoint}"
+        try:
+            if json_data is not None:
+                res = self.session.post(url, json=json_data)
+            else:
+                res = self.session.post(url, data=raw_data)
+        except requests.RequestException  as e:
+            raise IOError("Error communication to his site")
+
+        if not res.ok:
+            raise IOError(f"HIS return a non 2xx status code :{res.status_code} Text: {res.text[:300]}")
+        try:
+            return res.json()
+        except ValueError:
+            raise ValueError(f"HIS returned malformed non-JSON data {res.text[:300]}")
+
+
+    @retry(stop=stop_after_attempt(4), 
+           wait=wait_exponential(1, 3, 10),
+           retry=retry_if_exception_type(IOError),
+           reraise=True
+           )
+    def _execute_get(self, endpoint:str, param: Optional[Dict]) -> Dict[str, Any]:
+        url = f"{self.base_url}?{endpoint}"
+
+        try:
+            res = self.session.get(url, params=param)
+        except requests.RequestException as e:
+            raise IOError("Error communication to his site")
+
+        if not res.ok:
+            raise IOError(f"HIS return a non 2xx status code: {res.status_code} Text: {res.text[:300]}")
+
+        try:
+            return res.json()
+        except ValueError:
+            raise ValueError(f"HIS return a malformed non-JSON data: {res.text[:300]}")
+
+
+    def create_enrollee(self, data: Dict[str, Any]):
+        payload = self._build_payload(data)
+
+        try:
+            res_json = self._execute_post("createEnrollee", json_data=payload)
+        except ValueError as e:
+            return HISEnrollResult(HISEnrollStatus.FAILED, str(e))
+        except Exception as e:
+            return HISEnrollResult(HISEnrollStatus.FAILED, f"Failed after maximum network retries: {str(e)}")
+
+        success = res_json.get("success", False)
+        err_msg = res_json.get("errorMsg", "Unknown error")
+        msg = res_json.get("message", "Successfully enrolled")
+
+        if success:
+            return HISEnrollResult(HISEnrollStatus.CREATED, msg, res_json)
+        elif "exist" in err_msg.lower():
+            return  HISEnrollResult(HISEnrollStatus.ALREADY_EXISTS, err_msg, res_json)
+        else:
+            return HISEnrollResult(HISEnrollStatus.FAILED,err_msg, res_json)
+
+
+    def fetch_id_details_from_his(self, enrollee_no: str):
+        if not enrollee_no:
+            return HISIdCardResult(False, "Empty enrollee id")
+        try:
+            res_json = self._execute_get("", param={"getIDCardInfo": enrollee_no})
+        except ValueError as e:
+            return  HISIdCardResult(False, str(e))
+        except Exception as e:
+            return HISIdCardResult(False, str(e))
+        if not res_json.get("success", False):
+            return  HISIdCardResult(False, res_json.get("errorMsg", "Unknown error"))
+        return HISIdCardResult(True, res_json.get("message", "Successful got his_data"), res_json)
+
+
+    def _build_payload(self, data: Dict[str, Any]):
+        return {
         "cooperateCode": "",
         "title": data["title"],
         "surname": data["surname"].title(),
@@ -142,36 +248,3 @@ def create_enrolle(data: Dict):
         ],
         "children": [],
     }
-    url = f"{BASE}?createEnrollee"
-    session = get_his_session()
-    res = session.post(url, json=json_form, timeout=40)
-    print("Gotten message from server", res.text)
-
-    if res.status_code != 200:
-        return HisEnrolleeResult(
-            False, f"HTTP {res.status_code}: {res.text[:300]}", None
-        )
-
-    try:
-        res_json = res.json()
-    except ValueError:
-        return HisEnrolleeResult(False, f"Non-JSON response: {res.text[:300]}", None)
-
-    if not res_json.get("success", False):
-        return HisEnrolleeResult(
-            False, res_json.get("errorMsg", "Unknown error"), res_json
-        )
-    return HisEnrolleeResult(True, res_json.get("message"), res_json)
-
-
-def create_enrolle_with_retry(payload: Dict, max_retries: int = 3) -> HisEnrolleeResult:
-    last_result = HisEnrolleeResult(False, "", None)
-    for attempt in range(max_retries + 1):
-        result = create_enrolle(payload)
-        if result.success == True or "already exist" in (result.msg or "").lower():
-            result.success = True
-            return result
-        last_result = result
-        if attempt < max_retries:
-            time.sleep(3)
-    return last_result
