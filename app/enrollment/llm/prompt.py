@@ -48,4 +48,3 @@ Return this exact JSON structure. No extra fields. No prose.
   }
 }
 """
-
