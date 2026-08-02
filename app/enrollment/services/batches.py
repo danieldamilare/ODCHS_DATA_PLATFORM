@@ -3,18 +3,19 @@ from app.enrollment.models import Form, Batch, FormStatus, BatchStatus
 from flask import current_app
 from app.enrollment.utils import compute_hash, is_image_extension
 from app.enrollment.dataloader import get_loader
-from app.enrollment.tasks import extract_zip_for_processing
+from app.enrollment.tasks import extract_zip_for_processing, start_id_card_generate_job
 from werkzeug.datastructures import FileStorage
 from app import kv
 from stat import S_IFREG
 import sqlalchemy as sa
-from typing import Optional, Literal, Dict, Generator, Tuple
+from typing import Optional, Literal, Dict, Tuple
 from dataclasses import dataclass
 import uuid
 import os
 import zipfile
 from datetime import datetime
 from stream_zip import stream_zip, ZIP_32
+from collections.abc import Iterable
 
 
 @dataclass
@@ -27,14 +28,22 @@ class BatchJobResult:
 class BatchDownloadResult:
     status: Literal["404", "invalid", "success"]
     msg: Optional[str]
-    generator: Optional[Generator[Tuple, None, None]] = None
+    generator: Optional[Iterable[bytes]] = None
     filename: Optional[str] = None
 
 
 @dataclass
 class BatchIdCardJobResult:
-    status: Literal[""]
-    msg: Optional[str]
+    status: Literal["invalid", "started", "no_idcard"]
+    msg: Optional[str] = None
+
+
+@dataclass
+class BatchIdCardDownloadResult:
+    status: Literal["invalid", "no_job", "success"]
+    msg: Optional[str] = None
+    generator: Optional[Iterable[bytes]] = None
+    filename: Optional[str] = None
 
 
 class BatchServices:
@@ -201,4 +210,76 @@ class BatchServices:
         stream_generator = stream_zip(yield_files())
         return BatchDownloadResult(
             "success", generator=stream_generator, msg="", filename=f"{batch_id}.zip"
+        )
+
+    def start_id_card_generation(self, batch_id) -> BatchIdCardJobResult:
+        batch = db.session.scalar(sa.select(Batch).where(Batch.uuid == batch_id))
+        if not batch:
+            return BatchIdCardJobResult("invalid", "No batch with the given id")
+        forms = db.session.scalars(
+            sa.select(Form).where(
+                Form.batch_id == batch.id,
+                Form.status == FormStatus.ENROLLED,
+                Form.enrollee_number.isnot(None),
+            )
+        ).all()
+
+        if not forms:
+            return BatchIdCardJobResult(
+                "no_idcard",
+                "There are no ID card to generate for this batch, this can be because no form has been enroll, or all have already existed.",
+            )
+        start_id_card_generate_job.delay(batch_id)
+        return BatchIdCardJobResult("started", "Id Card generation started")
+
+    def id_card_download(self, batch_id):
+        batch = self.get(batch_id)
+        if not batch:
+            return BatchIdCardDownloadResult(
+                "invalid", "No Batch exists with the given id"
+            )
+        kv_batch_id_name = f"batch_idcard:{batch_id}"
+        kv_batch_id_status = f"batch_idcard_status:{batch_id}"
+        if (
+            kv.exists(kv_batch_id_name) != 1
+            or (kv.hget(kv_batch_id_status, "status") or "").lower() != "completed"
+        ):
+            return BatchIdCardDownloadResult(
+                "no_job",
+                "No Id download job has started for this batch. Please go to the batch and click download ID cards",
+            )
+        batch_dict = batch.to_dict()
+        loader = get_loader()
+        file_name = ""
+        if f := batch_dict["lga_no"]:
+            file_name += loader.reverse_lga.get(str(f), "")
+        if f := batch_dict["ward_no"]:
+            file_name += "_" if file_name else ""
+            file_name += loader.reverse_ward.get(str(f), "")
+        if f := batch_dict["facility_no"]:
+            file_name += "_" if file_name else ""
+            file_name += loader.reverse_facility.get(str(f), "")
+        file_name += "_" if file_name else ""
+        file_name += batch_dict["id"] +  ".zip"
+
+        def yield_file():
+            for cur in kv.smembers(kv_batch_id_name):
+
+                modified_at = datetime.now()
+                mode = S_IFREG | 0o666
+                file_name = os.path.basename(cur)
+                if not os.path.exists(cur):
+                    continue
+
+                def reader(path=cur):
+                    with open(path, "rb") as f:
+                        while chunk := f.read(65536):
+                            yield chunk
+
+                yield (file_name, modified_at, mode, ZIP_32, reader())
+
+        generator = stream_zip(yield_file())
+
+        return BatchIdCardDownloadResult(
+            "success", "Download Started", generator=generator, filename=file_name
         )

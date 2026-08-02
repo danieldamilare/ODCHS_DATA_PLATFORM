@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+
+<html class="loading" lang="en" data-textdirection="ltr">
+<!-- BEGIN: Head-->
+
+<head>
+    <base href="https://odchc-his.org/administrator/">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui">
+    <title>ODCHC HIS</title>
+    <link rel="apple-touch-icon" href="app-assets/images/ico/apple-icon-120.png">
+    <link rel="shortcut icon" type="image/x-icon" href="app-assets/images/ico/favicon.ico">
+    <link
+        href="//fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap"
+        rel="stylesheet" rel="stylesheet">
+    <!-- BEGIN: Vendor CSS-->
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/vendors.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/ui/prism.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/animate/animate.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/extensions/sweetalert2.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/extensions/toastr.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/tables/datatable/datatables.min.css">
+    <link rel="stylesheet" type="text/css"
+        href="app-assets/vendors/css/tables/extensions/responsive.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/tables/datatable/buttons.bootstrap4.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/vendors/css/forms/selects/select2.min.css">
+    <!-- END: Vendor CSS-->
+
+    <!-- BEGIN: Theme CSS-->
+    <link rel="stylesheet" type="text/css" href="app-assets/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/css/bootstrap-extended.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/css/colors.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/css/components.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/fonts/simple-line-icons/style.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/fonts/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/css/plugins/extensions/toastr.min.css">
+
+
+    <!-- END: Theme CSS-->
+
+    <!-- BEGIN: Page CSS-->
+    <link rel="stylesheet" type="text/css" href="app-assets/css/core/menu/menu-types/vertical-menu.min.css">
+    <link rel="stylesheet" type="text/css" href="app-assets/css/core/colors/palette-gradient.min.css">
+    <!-- END: Page CSS-->
+
+    <!-- BEGIN: Custom CSS-->
+    <link rel="stylesheet" type="text/css" href="assets/css/style.css">
+    <!-- END: Custom CSS-->
+
+    <script src="app-assets/vendors/js/extensions/js.cookie.js"></script>
+</head>
+<!-- END: Head-->
+
+<!-- BEGIN: Body-->
+
+<body class="vertical-layout vertical-menu 2-columns fixed-navbar" data-open="click" data-menu="vertical-menu"
+    data-col="2-columns">
+
+    <!-- BEGIN: Header-->
+    <nav
+        class="header-navbar navbar-expand-md navbar navbar-with-menu fixed-top navbar-light navbar-border navbar-semi-dark navbar-shadow">
+        <div class="navbar-wrapper">
+            <div class="navbar-header">
+                <ul class="nav navbar-nav flex-row">
+                    <li class="nav-item mobile-menu d-md-none mr-auto"><a
+                            class="nav-link nav-menu-main menu-toggle hidden-xs" href="javascript:;"><i
+                                class="feather icon-menu font-large-1"></i></a></li>
+                    <li class="nav-item"><a class="navbar-brand" href="javascript:;"><img class="brand-logo"
+                                alt="stack admin logo" src="app-assets/images/logo/logo-mini.png">
+                            <h2 class="brand-text">ODCHC-HIS</h2>
+                        </a></li>
+                    <li class="nav-item d-md-none"><a class="nav-link open-navbar-container" data-toggle="collapse"
+                            data-target="#navbar-mobile"><i class="fa fa-ellipsis-v"></i></a></li>
+                </ul>
+            </div>
+            <div class="navbar-container content">
+                <div class="collapse navbar-collapse" id="navbar-mobile">
+                    <ul class="nav navbar-nav mr-auto float-left">
+                        <li class="nav-item d-none d-md-block"><a class="nav-link nav-menu-main menu-toggle hidden-xs"
+                                href="javascript:;"><i class="feather icon-menu"></i></a></li>
+                        <!-- <li class="nav-item nav-search"><a class="nav-link nav-link-search" href="javascript:;"><i
+                                        class="ficon feather icon-search"></i></a>
+                                <div class="search-input">
+                                    <input class="input" type="text" placeholder="Search" tabindex="0"
+                                        data-search="template-search">
+                                    <div class="search-input-close"><i class="feather icon-x"></i></div>
+                                    <ul class="search-list"></ul>
+                                </div>
+                            </li> -->
+                    </ul>
+                    <ul class="nav navbar-nav float-right">
+
+
+                        <li class="dropdown dropdown-user nav-item"><a
+                                class="dropdown-toggle nav-link dropdown-user-link" href="javascript:;"
+                                data-toggle="dropdown">
+                                <div class="avatar"><img src="app-assets/images/portrait/avatar-s-1.png"
+                                        alt="avatar"><i></i>
+                                </div><span class="user-name"></span>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right"><a class="dropdown-item" href="profile"><i
+                                        class="feather icon-user"></i> Edit Profile</a>
+
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-label" href="javascript:;" id="log-out"><i
+                                    class="ficon feather icon-power"></i></a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <!-- END: Header-->
+
+
+    <!-- BEGIN: Main Menu-->
+    <div class="main-menu menu-fixed menu-light menu-accordion" data-scroll-to-active="true">
+        <div class="main-menu-content">
+            <ul class="navigation navigation-main" id="main-menu-navigation" data-menu="menu-navigation">
+                <li class=" nav-item mt-3" id="_dashboard"><a href="dashboard"><i class="icon-home"></i><span
+                            class="menu-title" data-i18n="Home">Home</span></a>
+                </li>
+                <li class="active nav-item mt-2" id="_beneficiaries"><a href="beneficiaries"><i
+                            class="feather icon-users"></i><span class="menu-title"
+                            data-i18n="Manage Beneficiary">Manage Beneficiary</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_ber"><a href="ber"><i class="feather icon-users"></i><span
+                            class="menu-title" data-i18n="Manage BER">Manage BER</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_staffs"><a href="staffs"><i class="icon-users"></i><span
+                            class="menu-title" data-i18n="Manage Staff">Manage Staff</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_claimstaffs"><a href="claim-staffs"><i class="fa fa-users"></i><span
+                            class="menu-title" data-i18n="Claims Staff">Claims Staff</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_agents"><a href="agents"><i class="feather icon-user-plus"></i><span
+                            class="menu-title" data-i18n="Manage Agents">Manage Agents</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_plans"><a href="plans"><i class="feather icon-file-text"></i><span
+                            class="menu-title" data-i18n="Manage Plans">Manage Plans</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_provider"><a href="provider"><i class="fa fa-hospital-o"></i><span
+                            class="menu-title" data-i18n="Manage Provider">Manage Provider</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_per"><a href="per"><i class="fa fa-file-text-o"></i><span
+                            class="menu-title" data-i18n="Manage Provider Enrollment Request">Manage Provider
+                            Enrollment Request</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_refer"><a href="referrals"><i class="fa fa-recycle"></i><span
+                            class="menu-title" data-i18n="Manage Referral">Manage Referral</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_encounter"><a href="encounter"><i
+                            class="feather icon-check-circle"></i><span class="menu-title"
+                            data-i18n="Encounter">Encounter</span></a></li>
+                <li class=" nav-item mt-2" id="_services"><a href="services"><i class="fa fa-heartbeat"></i><span
+                            class="menu-title" data-i18n="Manage Services">Manage Services</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_laboratory"><a href="laboratory"><i class="fa fa-stethoscope"></i><span
+                            class="menu-title" data-i18n="Manage Laboratory">Manage Laboratory</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_drugs"><a href="drugs"><i class="fa fa-plus-square-o"></i><span
+                            class="menu-title" data-i18n="Manage Drugs">Manage Drugs</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_medhist"><a href="medhist"><i class="feather icon-thermometer"></i><span
+                            class="menu-title" data-i18n="Manage Medical History">Manage Medical History</span></a>
+                </li>
+                <li class=" nav-item mt-2 has-sub" id="_claimsman"><a href="#"><i
+                            class="feather icon-file-text"></i><span class="menu-title"
+                            data-i18n="Claims Management">Claims Management</span></a>
+                    <ul class="menu-content">
+                        <li class=""><a class="menu-item" href="all-claims" data-i18n="Claims Request">All Claims
+                                Request</a>
+                        </li>
+                        <li class="" id="_cr"><a class="menu-item" href="claims" data-i18n="Claims Request">Claims
+                                Request</a>
+                        </li>
+                        <li class="" id="_pr"><a class="menu-item" href="par" data-i18n="Prior Authorization
+                                    Request">Prior Authorization
+                                Request</a>
+                        </li>
+                        <li class=""><a class="menu-item" href="all-par" data-i18n="All Prior Authorization
+                                    Request">All Prior Authorization
+                                Request</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class=" nav-item mt-2 hidden" id="_panellist"><a href="panellist"><i
+                            class="feather icon-users"></i><span class="menu-title" data-i18n="Panel List">Panel
+                            List</span></a></li>
+                <li class=" nav-item mt-2" id="_logs"><a href="logs"><i class="fa fa-list"></i><span class="menu-title"
+                            data-i18n="Activity Logs">Activity Logs</span></a>
+                </li>
+                <li class=" nav-item mt-2" id="_reports"><a href="reports"><i class="fa fa-bar-chart"></i><span
+                            class="menu-title" data-i18n="View Reports">View Reports</span></a>
+                </li>
+
+            </ul>
+        </div>
+    </div>
+    <!-- END: Main Menu-->
+
+    <!-- BEGIN: Content-->
+    <div class="app-content content">
+        <div class="content-overlay"></div>
+        <div class="content-wrapper">
+            <div class="content-header row">
+                <div class="content-header-left col-md-6 col-12 mb-1">
+                    <h3 class="content-header-title">Manage Beneficiaries</h3>
+                </div>
+                <div class="content-header-right col-md-6 col-12 text-right">
+                    <button type="button" class="btn btn-accent-1 btn-github" id="_sendSMS" data-toggle="modal"
+                        data-target="#sms"><i class="feather icon-message-square"></i>
+                        Send SMS</button>
+                    <button type="button" class="btn btn-primary" id="_addBenef"><i class="feather icon-plus"></i>
+                        Add Beneficiaries</button>
+                    <button type="button" class="btn btn-amber" id="_upBenef"><i class="feather icon-upload"></i>
+                        Upload Beneficiaries</button>
+                    <button type="button" class="btn btn-flickr" data-toggle="modal" data-target="#profModal"><i
+                            class="feather icon-upload"></i>
+                        Upload Profoma</button>
+                    <button type="button" class="btn btn-flickr hidden" id="extnd" data-toggle="modal"
+                        data-target="#renewModal">Extend</button>
+                </div>
+            </div>
+            <div class="content-body">
+                <div class="row">
+                    <div class="col-lg-12" id="mb">
+                        <div class="card radius-5">
+                            <div class="card-content">
+                                <div class="card-body">
+                                    <h3>Search</h3>
+                                    <div class="row">
+                                        <div class="col-lg-4">
+                                            <div class="form-group">
+                                                <input type="text" class="form-control mb-0" id="scName"
+                                                    placeholder="Enrolle Name/Enrolle Number/Goverment ID" lang="en">
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-3">
+                                            <div class="form-group">
+                                                <select class="form-control custom-select " id="splan">
+                                                    <option value="" selected disabled>Plan Type
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2">
+                                            <div class="form-group">
+                                                <select class="form-control custom-select" id="slga" required>
+                                                    <option value="" selected disabled>LGA
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2">
+                                            <div class="form-group ">
+                                                <select class="form-control custom-select" id="sward" required>
+                                                    <option value="" selected disabled>Ward
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-3">
+                                            <div class="form-group">
+                                                <select class="form-control custom-select " id="sprov" required>
+                                                    <option value="" selected disabled>Provider
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2">
+                                            <div class="form-group">
+                                                <input type="date" class="form-control mb-0" id="sDate" lang="en">
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2">
+                                            <div class="form-group ">
+                                                <input type="date" class="form-control mb-0" id="eDate" lang="en">
+                                            </div>
+                                        </div>
+
+
+
+                                        <div class="col-lg-2">
+                                            <div class="form-group">
+                                                <select class="form-control custom-select " id="sta">
+                                                    <option value="" selected disabled>Status
+                                                    </option>
+                                                    <option value="active">Active</option>
+                                                    <option value="inactive">Inactive</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-11"><button type="button"
+                                                class="btn btn-primary mr-1 btn-search btn-block">Search</button></div>
+                                        <div class="col-lg-1"><button type="button"
+                                                class="btn btn-link mr-1 reset">clear</button></div>
+                                    </div>
+                                    <hr>
+                                    <div class="table-responsive">
+                                        <table border="0" cellspacing="5" cellpadding="5" class="">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="text-right">Min age:</td>
+                                                    <td><input type="text" id="min" name="min" class=""></td>
+                                                    <td class="text-right">Max age:</td>
+                                                    <td><input type="text" id="max" name="max" class=""></td>
+                                                    <td class="text-right ">LGA:</td>
+                                                    <td id="lg_" class=""></td>
+                                                    <td class="text-right ">Ward:</td>
+                                                    <td id="wrd_" class=""></td>
+                                                    <td class="text-right ">Provider:</td>
+                                                    <td id="prv_" class=""></td>
+                                                    <td class="text-right hidden">Registered btwn:</td>
+                                                    <td class="hidden"><input type="date" id="fdate" name="fdate">
+                                                    </td>
+                                                    <td class="text-right hidden">and:</td>
+                                                    <td class="hidden"><input type="date" id="tdate" name="tdate">
+                                                    </td>
+                                                    <td class="text-right ">Plan:</td>
+                                                    <td id="pln_" class=""></td>
+                                                    <td class="text-right">Type:</td>
+                                                    <td id="typ_" class=""></td>
+                                                    <td class="text-right ">Status:</td>
+                                                    <td id="sta_" class=""></td>
+                                                </tr>
+
+                                            </tbody>
+                                        </table>
+                                        <table id="benefTable" class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th class="hidden">Age</th>
+                                                    <th>Gender</th>
+                                                    <th>Phone Number</th>
+                                                    <th>Health Plan</th>
+                                                    <th>Policy Number</th>
+                                                    <th>Provider</th>
+                                                    <th>Enrolled On</th>
+                                                    <th>Expires in</th>
+                                                    <th>Dpndt.</th>
+                                                    <th>Type</th>
+                                                    <th>Status</th>
+                                                    <th class="cell-fit"></th>
+                                                    <th class="hidden">Date</th>
+                                                    <th class="hidden">Ward</th>
+                                                    <th class="hidden">LGA</th>
+                                                    <th class="hidden">BHCPF Number</th>
+                                                    <th class="hidden">Surname</th>
+                                                    <th class="hidden">Firstname</th>
+                                                    <th class="hidden">Othername</th>
+                                                    <th class="hidden">Picture URL</th>
+                                                    <th class="hidden">QR URL</th>
+                                                    <th class="hidden">Expiry Date</th>
+                                                    <th class="hidden">Address</th>
+                                                    <th class="hidden">Parent MDA</th>
+                                                    <th class="hidden">Present MDA</th>
+                                                    <th class="hidden">Goverment ID</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="benefBody">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-12 hidden" id="ab">
+                        <div class="card radius-20">
+                            <div class="card-header">
+                                <h3 class="card-title text-center w-100 mt-2">Personal Information</h3>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-body pb-5 pl-5 pr-5">
+                                    <form method="POST" name="addBenefForm" id="addBenefForm">
+                                        <div class="row">
+                                            <div class="col-lg-2 offset-5">
+                                                <div class="bImg ml-1">
+                                                    <img src="app-assets/images/portrait/user.png" id="Pic">
+                                                </div>
+                                                <input class="file-upload" id="profPic" type="file" accept="image/*" />
+                                                <label for="profPic" class="btn btn-primary btn-block mt-1">Upload
+                                                    Picture</label>
+                                                <input type="hidden" id="img64" required>
+                                            </div>
+                                            <div class="col-lg-2 offset-5">
+                                                <button type="button" class="btn btn-secondary btn-block" id="webCam"
+                                                    data-toggle="modal" data-target="#webcamModal" data-typ="mai">Webcam
+                                                    Picture</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-lg-4">
+                                                <div class="form-group">
+                                                    <label>*Plan Type</label>
+                                                    <select class="form-control custom-select " id="ptype" required>
+                                                        <option value="" selected disabled>*Plan Type
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row mt-2">
+                                            <div class="col-lg-2">
+                                                <div class="form-group">
+                                                    <label>Title</label>
+                                                    <select class="form-control custom-select" id="title"
+                                                        data-placeholder="Select Title">
+                                                        <option value="" selected disabled>Title
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*First Name</label>
+                                                    <input type="text" id="fname" class="form-control"
+                                                        placeholder="*First Name" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>Other Name</label>
+                                                    <input type="text" id="oname" class="form-control"
+                                                        placeholder="Other Name">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <div class="form-group">
+                                                    <label>*Last Name</label>
+                                                    <input type="text" id="lname" class="form-control"
+                                                        placeholder="*Last Name" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <div class="form-group">
+                                                    <label>Email Address</label>
+                                                    <input type="email" id="email" class="form-control"
+                                                        placeholder="Email Address">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <div class="form-group">
+                                                    <label>*Mobile Number</label>
+                                                    <input type="tel" id="mobile" class="form-control"
+                                                        placeholder="*Mobile Number" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*Date of Birth</label>
+                                                    <input type="text" id="dob" class="form-control"
+                                                        placeholder="*Date of Birth" required
+                                                        onfocus="(this.type='date')">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>Age</label>
+                                                    <input type="text" id="age" class="form-control" placeholder="Age"
+                                                        readonly>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-1">
+                                                <p class="mt-1">*Gender</p>
+                                            </div>
+                                            <div class="col-lg-5">
+                                                <div class="d-inline-block custom-control custom-radio mr-1 mt-1">
+                                                    <input type="radio" class="custom-control-input" name="gender"
+                                                        id="gender1" value="Male">
+                                                    <label class="custom-control-label" for="gender1"
+                                                        required>Male</label>
+                                                </div>
+                                                <div class="d-inline-block custom-control custom-radio mr-1 mt-1">
+                                                    <input type="radio" class="custom-control-input" name="gender"
+                                                        id="gender2" value="Female">
+                                                    <label class="custom-control-label" for="gender2"
+                                                        required>Female</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3" id="mari_">
+                                                <div class="form-group">
+                                                    <label>*Marital Status</label>
+                                                    <select class="form-control custom-select " id="mstat" required>
+                                                        <option value="" selected disabled>*Marital Status
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*No of Children</label>
+                                                    <input type="number" id="kids" class="form-control"
+                                                        placeholder="No of Children" min="0" max="4" value="0" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <div class="form-group">
+                                                    <label>*Residential Address</label>
+                                                    <input type="text" id="address" class="form-control"
+                                                        placeholder="*Residential Address" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*State</label>
+                                                    <select class="form-control custom-select " id="deployState"
+                                                        required>
+                                                        <option value="" selected disabled>*State
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*LGA of Residence</label>
+                                                    <select class="form-control custom-select " id="deployLGA" required>
+                                                        <option value="" selected disabled>*LGA of Residence
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*Ward</label>
+                                                    <select class="form-control custom-select " id="ward" required>
+                                                        <option value="" selected disabled>*Ward
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden">
+                                                <div class="form-group">
+                                                    <label>*Provider LGA</label>
+                                                    <select class="form-control custom-select" id="provLga">
+                                                        <option value="" selected disabled>*Provider LGA
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*Provider</label>
+                                                    <select class="form-control custom-select " id="provider" required>
+                                                        <option value="" selected disabled>*Provider
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <div class="form-group">
+                                                    <label>*State of Origin</label>
+                                                    <select class="form-control custom-select " id="state" required>
+                                                        <option value="" selected disabled>*State of Origin
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <div class="form-group">
+                                                    <label>*LGA of Origin</label>
+                                                    <select class="form-control custom-select " id="city" required>
+                                                        <option value="" selected disabled>*LGA of Origin
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <div class="form-group">
+                                                    <label>Nationality</label>
+                                                    <select class="form-control custom-select " id="nation">
+                                                        <option value="" selected disabled>Nationality
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3" id="edu_">
+                                                <div class="form-group">
+                                                    <label>*Level of Education</label>
+                                                    <select class="form-control custom-select " id="edu">
+                                                        <option value="" selected disabled>*Level of Education
+                                                        </option>
+                                                        <option value="None">None</option>
+                                                        <option value="Primary">Primary</option>
+                                                        <option value="Secondary">Secondary</option>
+                                                        <option value="Graduate">Graduate</option>
+                                                        <option value="Post Graduate">Post Graduate</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>Religion</label>
+                                                    <select class="form-control custom-select " id="religion">
+                                                        <option value="" selected disabled>Religion
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>Tribe</label>
+                                                    <select class="form-control custom-select " id="tribe">
+                                                        <option value="" selected disabled>Tribe
+                                                        </option>
+                                                        <option value="Hausa">Hausa</option>
+                                                        <option value="Igbo">Igbo</option>
+                                                        <option value="Yoruba">Yoruba</option>
+                                                        <option value="Others">Others</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3" id="occup_">
+                                                <div class="form-group">
+                                                    <label>Occupation</label>
+                                                    <select class="form-control custom-select " id="occup">
+                                                        <option value="" selected disabled>Occupation
+                                                        </option>
+                                                        <option value="Farmer">Farmer</option>
+                                                        <option value="Artisan">Artisan</option>
+                                                        <option value="Student">Student</option>
+                                                        <option value="Trader">Trader</option>
+                                                        <option value="Retiree">Retiree</option>
+                                                        <option value="Others">Others</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="org_">
+                                                <div class="form-group">
+                                                    <label>Organisation</label>
+                                                    <input type="text" id="org" class="form-control"
+                                                        placeholder="Organisation">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="assos_">
+                                                <div class="form-group">
+                                                    <label>Association</label>
+                                                    <input type="text" id="assos" class="form-control"
+                                                        placeholder="Association">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_">
+                                                <div class="form-group">
+                                                    <label>*Parent MDA</label>
+                                                    <select class="form-control custom-select " id="mda">
+                                                        <option value="" selected disabled>*Parent MDA
+                                                        </option>
+
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_8">
+                                                <div class="form-group">
+                                                    <label>*Present MDA</label>
+                                                    <select class="form-control custom-select " id="mda2">
+                                                        <option value="" selected disabled>*Present MDA
+                                                        </option>
+
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_1">
+                                                <div class="form-group">
+                                                    <label>*Department</label>
+                                                    <input type="text" id="cate" class="form-control"
+                                                        placeholder="*Department">
+
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_2">
+                                                <div class="form-group">
+                                                    <label>Goverment ID</label>
+                                                    <input type="text" id="govID" class="form-control"
+                                                        placeholder="Goverment ID">
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-lg-3 hidden" id="pub_3">
+                                                    <div class="form-group">
+                                                        <input type="text" id="govID" class="form-control"
+                                                            placeholder="Goverment ID" required>
+                                                    </div>
+                                                </div> -->
+                                            <div class="col-lg-3 hidden" id="pub_4">
+                                                <div class="form-group">
+                                                    <label>*Cadre</label>
+                                                    <select id="cadre" class="form-control custom-select">
+                                                        <option value="" selected="selected">Please select</option>
+                                                        <option value="Accountant">Accountant</option>
+                                                        <option value="Acting General Manager">Acting General Manager
+                                                        </option>
+                                                        <option value="Acting Permanent Secretary">Acting Permanent
+                                                            Secretary</option>
+                                                        <option value="Acting Permanent Secretary(Medical)">Acting
+                                                            Permanent Secretary(Medical)</option>
+                                                        <option value="Actuary">Actuary</option>
+                                                        <option value="Administrative Officer">Administrative Officer
+                                                        </option>
+                                                        <option value="Advert Traffic Assistant">Advert Traffic
+                                                            Assistant</option>
+                                                        <option value="Advert Traffic Officer">Advert Traffic Officer
+                                                        </option>
+                                                        <option value="Agricultural Assistant">Agricultural Assistant
+                                                        </option>
+                                                        <option value="Agricultural Engineer">Agricultural Engineer
+                                                        </option>
+                                                        <option value="Agricultural Field Overseer">Agricultural Field
+                                                            Overseer</option>
+                                                        <option value="Agricultural Officer">Agricultural Officer
+                                                        </option>
+                                                        <option value="Agricultural Planning Officer">Agricultural
+                                                            Planning Officer</option>
+                                                        <option value="Agricultural Technician">Agricultural Technician
+                                                        </option>
+                                                        <option value="Agricultural Technologist">Agricultural
+                                                            Technologist</option>
+                                                        <option value="Agricultural Technologist">Agricultural
+                                                            Technologist</option>
+                                                        <option value="Anaesthesia Technicians">Anaesthesia Technicians
+                                                        </option>
+                                                        <option value="Animal Health &amp;Health Technician">Animal
+                                                            Health &amp;Health Technician</option>
+                                                        <option value="Architect">Architect</option>
+                                                        <option value="Art Production Attendant">Art Production
+                                                            Attendant</option>
+                                                        <option value="Artisan/Craftsman">Artisan/Craftsman</option>
+                                                        <option value="Arts Production Officer">Arts Production Officer
+                                                        </option>
+                                                        <option value="Assistant Coach">Assistant Coach</option>
+                                                        <option value="Assistant Dental Technologists">Assistant Dental
+                                                            Technologists</option>
+                                                        <option value="Assistant Education Officer">Assistant Education
+                                                            Officer</option>
+                                                        <option value="Assistant Nurses Tutor">Assistant Nurses Tutor
+                                                        </option>
+                                                        <option value="Assistant Official Reporter">Assistant Official
+                                                            Reporter</option>
+                                                        <option value="Assistant Social Welfare Officer">Assistant
+                                                            Social Welfare Officer</option>
+                                                        <option value="Auditor">Auditor</option>
+                                                        <option value="Bailiff">Bailiff</option>
+                                                        <option value="Biomedical">Biomedical</option>
+                                                        <option value="Boatman">Boatman</option>
+                                                        <option value="Building Officer">Building Officer</option>
+                                                        <option value="Cameraman">Cameraman</option>
+                                                        <option value="Catering Assistant">Catering Assistant</option>
+                                                        <option value="Catering Officer">Catering Officer</option>
+                                                        <option value="Chainman">Chainman</option>
+                                                        <option value="Civil Engineer">Civil Engineer</option>
+                                                        <option value="Cleaner">Cleaner</option>
+                                                        <option value="Clerical (News Assistant)">Clerical (News
+                                                            Assistant)</option>
+                                                        <option value="Clerical (Programmes)">Clerical (Programmes)
+                                                        </option>
+                                                        <option value="Clerical Staff">Clerical Staff</option>
+                                                        <option value="Climatologist">Climatologist</option>
+                                                        <option value="Commercial Officer">Commercial Officer</option>
+                                                        <option value="Community Development Assistant">Community
+                                                            Development Assistant</option>
+                                                        <option value="COMMUNITY DEVELOPMENT INSPECTOR">COMMUNITY
+                                                            DEVELOPMENT INSPECTOR</option>
+                                                        <option value="Community Development Officer">Community
+                                                            Development Officer</option>
+                                                        <option value="Community Health Extension Technician">Community
+                                                            Health Extension Technician</option>
+                                                        <option value="Community Health Officer">Community Health
+                                                            Officer</option>
+                                                        <option value="Community Health Technician">Community Health
+                                                            Technician</option>
+                                                        <option value="Confidential Secretary">Confidential Secretary
+                                                        </option>
+                                                        <option value="Consolidated Salary (HOS, PS, AG)">Consolidated
+                                                            Salary (HOS, PS, AG)</option>
+                                                        <option value="Co-Operative Inspector">Co-Operative Inspector
+                                                        </option>
+                                                        <option value="Co-Operative Officer">Co-Operative Officer
+                                                        </option>
+                                                        <option value="Cultural Assistant">Cultural Assistant</option>
+                                                        <option value="Cultural Officer">Cultural Officer</option>
+                                                        <option value="Culture And Tourism">Culture And Tourism</option>
+                                                        <option value="Data Processing Assistant">Data Processing
+                                                            Assistant</option>
+                                                        <option value="Data Processing Officer">Data Processing Officer
+                                                        </option>
+                                                        <option value="Dental Officer">Dental Officer</option>
+                                                        <option value="Dental Technician">Dental Technician</option>
+                                                        <option value="DENTAL TECHNOLOGIST">DENTAL TECHNOLOGIST</option>
+                                                        <option value="Dental Therapist">Dental Therapist</option>
+                                                        <option value="Dietician">Dietician</option>
+                                                        <option value="Dubbing Theatre Projectionist">Dubbing Theatre
+                                                            Projectionist</option>
+                                                        <option value="Editor (Professional)">Editor (Professional)
+                                                        </option>
+                                                        <option value="Education Officer">Education Officer</option>
+                                                        <option value="Eletrical Engineer">Eletrical Engineer</option>
+                                                        <option value="Enumeratior / Field Assistant">Enumeratior /
+                                                            Field Assistant</option>
+                                                        <option value="Enviromental Health Superintendent">Enviromental
+                                                            Health Superintendent</option>
+                                                        <option value="Environmental Health Officer">Environmental
+                                                            Health Officer</option>
+                                                        <option value="Estate Officer">Estate Officer</option>
+                                                        <option value="Ethnographer">Ethnographer</option>
+                                                        <option value="Executive (Sub-Professional)">Executive
+                                                            (Sub-Professional)</option>
+                                                        <option value="Executive Officer (Accounts)">Executive Officer
+                                                            (Accounts)</option>
+                                                        <option value="Executive Officer (Audit)">Executive Officer
+                                                            (Audit)</option>
+                                                        <option value="Executive Officer (Culture)">Executive Officer
+                                                            (Culture)</option>
+                                                        <option value="Executive Officer (Film/Video Censorship)">
+                                                            Executive Officer (Film/Video Censorship)</option>
+                                                        <option value="Executive Officer (General Duties)">Executive
+                                                            Officer (General Duties)</option>
+                                                        <option value="Executive Officer (Revenue)">Executive Officer
+                                                            (Revenue)</option>
+                                                        <option value="Executive Officer (Tourism)">Executive Officer
+                                                            (Tourism)</option>
+                                                        <option value="Executive Officer Information">Executive Officer
+                                                            Information</option>
+                                                        <option value="Executive Secretary">Executive Secretary</option>
+                                                        <option value="Field Attendant">Field Attendant</option>
+                                                        <option value="Field Overseer">Field Overseer</option>
+                                                        <option value="Film / Video Censorship">Film / Video Censorship
+                                                        </option>
+                                                        <option value="Film Editing Assistant">Film Editing Assistant
+                                                        </option>
+                                                        <option value="Film Editor">Film Editor</option>
+                                                        <option value="Film Production Assistant">Film Production
+                                                            Assistant</option>
+                                                        <option value="Film Products Officer">Film Products Officer
+                                                        </option>
+                                                        <option value="Film/Video Censorship Officer">Film/Video
+                                                            Censorship Officer</option>
+                                                        <option value="Fire Officer">Fire Officer</option>
+                                                        <option value="Fire Superintendent">Fire Superintendent</option>
+                                                        <option value="Fireman">Fireman</option>
+                                                        <option value="Fisheries Officer">Fisheries Officer</option>
+                                                        <option value="Fisheries Overseer">Fisheries Overseer</option>
+                                                        <option value="Fisheries Superintendent">Fisheries
+                                                            Superintendent</option>
+                                                        <option value="Fisheries Technologist">Fisheries Technologist
+                                                        </option>
+                                                        <option value="Fisherman">Fisherman</option>
+                                                        <option value="Foreman">Foreman</option>
+                                                        <option value="Foreman/Craftsman">Foreman/Craftsman</option>
+                                                        <option value="Forest Assistant">Forest Assistant</option>
+                                                        <option value="Forest Guard">Forest Guard</option>
+                                                        <option value="Forest Officer">Forest Officer</option>
+                                                        <option value="Forest Overseer">Forest Overseer</option>
+                                                        <option value="Forest Superintendent">Forest Superintendent
+                                                        </option>
+                                                        <option value="Forest Technologist">Forest Technologist</option>
+                                                        <option value="Gardner">Gardner</option>
+                                                        <option value="General Manager">General Manager</option>
+                                                        <option value="General Manager">General Manager</option>
+                                                        <option value="Geological Assistant">Geological Assistant
+                                                        </option>
+                                                        <option value="Geologist">Geologist</option>
+                                                        <option value="Graduate">Graduate</option>
+                                                        <option value="Graphic Art Attendant / Assistant">Graphic Art
+                                                            Attendant / Assistant</option>
+                                                        <option value="Graphic Arts Officer">Graphic Arts Officer
+                                                        </option>
+                                                        <option value="Health Assistant">Health Assistant</option>
+                                                        <option value="Health Attendant">Health Attendant</option>
+                                                        <option value="Health Education">Health Education</option>
+                                                        <option value="Health Information Officer">Health Information
+                                                            Officer</option>
+                                                        <option value="Hydrogologist / Hydrologist">Hydrogologist /
+                                                            Hydrologist</option>
+                                                        <option value="Information Assistant">Information Assistant
+                                                        </option>
+                                                        <option value="Information Officer">Information Officer</option>
+                                                        <option value="Inspector Of Area Courts">Inspector Of Area
+                                                            Courts</option>
+                                                        <option value="Inspector Of Taxes">Inspector Of Taxes</option>
+                                                        <option value="Inspector Of Weights And Measures">Inspector Of
+                                                            Weights And Measures</option>
+                                                        <option value="Instructor (Technical)">Instructor (Technical)
+                                                        </option>
+                                                        <option value="Insurance Inspector">Insurance Inspector</option>
+                                                        <option value="Irrigation Attendant">Irrigation Attendant
+                                                        </option>
+                                                        <option value="Irrigation Officer">Irrigation Officer</option>
+                                                        <option value="Irrigation Overseer">Irrigation Overseer</option>
+                                                        <option value="Irrigation Superintendent">Irrigation
+                                                            Superintendent</option>
+                                                        <option value="Junior Community Health Extension Worker">Junior
+                                                            Community Health Extension Worker</option>
+                                                        <option value="Junior Deck Staff">Junior Deck Staff</option>
+                                                        <option value="Kitchen Attendant / Cook">Kitchen Attendant /
+                                                            Cook</option>
+                                                        <option value="Laboratory Superintendant(Maintanance) Cadre">
+                                                            Laboratory Superintendant(Maintanance) Cadre</option>
+                                                        <option value="Laboratory Technologist (Mining)">Laboratory
+                                                            Technologist (Mining)</option>
+                                                        <option value="Lands  Officer">Lands Officer</option>
+                                                        <option value="Lands Assistant">Lands Assistant</option>
+                                                        <option value="Legislative Officer / Clerk">Legislative Officer
+                                                            / Clerk</option>
+                                                        <option value="Librarian">Librarian</option>
+                                                        <option value="Library Officer">Library Officer</option>
+                                                        <option value="Livestock Attendant">Livestock Attendant</option>
+                                                        <option value="Livestock Officer">Livestock Officer</option>
+                                                        <option
+                                                            value="Livestock Officer / Livestock Development Officer">
+                                                            Livestock Officer / Livestock Development Officer</option>
+                                                        <option value="Livestock Overseer">Livestock Overseer</option>
+                                                        <option value="Livestock Superintendent">Livestock
+                                                            Superintendent</option>
+                                                        <option value="Livestock Technologist">Livestock Technologist
+                                                        </option>
+                                                        <option value="Magistrate">Magistrate</option>
+                                                        <option value="Master Cadre">Master Cadre</option>
+                                                        <option value="Master Fisherman">Master Fisherman</option>
+                                                        <option value="Mechanical Engineer">Mechanical Engineer</option>
+                                                        <option value="Medical Consultants">Medical Consultants</option>
+                                                        <option value="Medical Imaging Scientist">Medical Imaging
+                                                            Scientist</option>
+                                                        <option value="Medical Laboratory Scientist">Medical Laboratory
+                                                            Scientist</option>
+                                                        <option value="Medical Laboratory Technician">Medical Laboratory
+                                                            Technician</option>
+                                                        <option value="Medical Laboratory Technologist">Medical
+                                                            Laboratory Technologist</option>
+                                                        <option value="Medical Officer">Medical Officer</option>
+                                                        <option value="Medical Records Technician">Medical Records
+                                                            Technician</option>
+                                                        <option value="Messenger">Messenger</option>
+                                                        <option value="Meteorologist">Meteorologist</option>
+                                                        <option value="Motor Driver/Driver Mechanic">Motor Driver/Driver
+                                                            Mechanic</option>
+                                                        <option value="NCE">NCE</option>
+                                                        <option value="No Cadre For Now">No Cadre For Now</option>
+                                                        <option value="Nurse Tutor">Nurse Tutor</option>
+                                                        <option value="Nursing Officer">Nursing Officer</option>
+                                                        <option value="Nutrition Officer">Nutrition Officer</option>
+                                                        <option value="Official Reporter">Official Reporter</option>
+                                                        <option value="Official Reporter">Official Reporter</option>
+                                                        <option value="Optometrist">Optometrist</option>
+                                                        <option value="Part - Time Chairman">Part - Time Chairman
+                                                        </option>
+                                                        <option value="Part - Time Member">Part - Time Member</option>
+                                                        <option value="Part Time Member">Part Time Member</option>
+                                                        <option value="Permanent Secretary">Permanent Secretary</option>
+                                                        <option value="Permanent Secretary(Medical)">Permanent
+                                                            Secretary(Medical)</option>
+                                                        <option value="Pharmacist">Pharmacist</option>
+                                                        <option value="Pharmacy Technician">Pharmacy Technician</option>
+                                                        <option value="Pharmacy Technician">Pharmacy Technician</option>
+                                                        <option value="Photographer">Photographer</option>
+                                                        <option value="Photographic Assistant">Photographic Assistant
+                                                        </option>
+                                                        <option value="Physiotherapist">Physiotherapist</option>
+                                                        <option value="Planning Officer">Planning Officer</option>
+                                                        <option value="Plant Operator">Plant Operator</option>
+                                                        <option value="Plastic Technician">Plastic Technician</option>
+                                                        <option value="Political Offices Holders">Political Offices
+                                                            Holders</option>
+                                                        <option value="Press Attendant">Press Attendant</option>
+                                                        <option value="Primary Health Care Tutor">Primary Health Care
+                                                            Tutor</option>
+                                                        <option value="Printing Assistant">Printing Assistant</option>
+                                                        <option value="Printing Assistant (Photo/Lithography)">Printing
+                                                            Assistant (Photo/Lithography)</option>
+                                                        <option value="Printing Officer">Printing Officer</option>
+                                                        <option value="Process Server">Process Server</option>
+                                                        <option value="Produce Inspector">Produce Inspector</option>
+                                                        <option value="Produce Officer">Produce Officer</option>
+                                                        <option value="Produce Superintendent">Produce Superintendent
+                                                        </option>
+                                                        <option value="Producer">Producer</option>
+                                                        <option value="Programme Analyst">Programme Analyst</option>
+                                                        <option value="Programmes Officer">Programmes Officer</option>
+                                                        <option value="Prosthetist">Prosthetist</option>
+                                                        <option value="Psycologist">Psycologist</option>
+                                                        <option value="Quantity Surveyor">Quantity Surveyor</option>
+                                                        <option value="QUARTER MASTER">QUARTER MASTER</option>
+                                                        <option value="Radio / Telephone Operator">Radio / Telephone
+                                                            Operator</option>
+                                                        <option value="Radiographer">Radiographer</option>
+                                                        <option value="Radiographer">Radiographer</option>
+                                                        <option value="Registrar Of Co-Operative Societies">Registrar Of
+                                                            Co-Operative Societies</option>
+                                                        <option value="Registrar Of Deeds">Registrar Of Deeds</option>
+                                                        <option value="REGISTRARS CADRE">REGISTRARS CADRE</option>
+                                                        <option value="REGISTRY ASSISTANT CADRE">REGISTRY ASSISTANT
+                                                            CADRE</option>
+                                                        <option value="Revenue  Officer">Revenue Officer</option>
+                                                        <option value="Road Overseer">Road Overseer</option>
+                                                        <option value="Safety Inspector">Safety Inspector</option>
+                                                        <option value="Scientific Officer">Scientific Officer</option>
+                                                        <option value="Scientific Officer (Mining)">Scientific Officer
+                                                            (Mining)</option>
+                                                        <option value="Scientific Officer (Water)">Scientific Officer
+                                                            (Water)</option>
+                                                        <option value="Secretariat Assistant">Secretariat Assistant
+                                                        </option>
+                                                        <option value="Security Guard">Security Guard</option>
+                                                        <option value="Senior Deck Steff">Senior Deck Steff</option>
+                                                        <option value="Sergent At Arm">Sergent At Arm</option>
+                                                        <option value="Social Welfare Assistant">Social Welfare
+                                                            Assistant</option>
+                                                        <option value="Social Welfare Officer">Social Welfare Officer
+                                                        </option>
+                                                        <option value="Soil Officer">Soil Officer</option>
+                                                        <option value="Special Cadre (DG, CE, GM, Programe Manager)">
+                                                            Special Cadre (DG, CE, GM, Programe Manager)</option>
+                                                        <option value="Sports Assistant">Sports Assistant</option>
+                                                        <option value="Sports Officer">Sports Officer</option>
+                                                        <option value="Staff Nurse/Staff Midwife">Staff Nurse/Staff
+                                                            Midwife</option>
+                                                        <option value="State Counsel">State Counsel</option>
+                                                        <option value="Statistical Assistant">Statistical Assistant
+                                                        </option>
+                                                        <option value="Statistical Officer/Field Suprntendent">
+                                                            Statistical Officer/Field Suprntendent</option>
+                                                        <option value="Statistician">Statistician</option>
+                                                        <option value="Steward">Steward</option>
+                                                        <option value="Store Examiner">Store Examiner</option>
+                                                        <option value="Store Officer">Store Officer</option>
+                                                        <option value="Storekeeper">Storekeeper</option>
+                                                        <option value="Structural Engineer">Structural Engineer</option>
+                                                        <option value="Sub-Editor (sub-Professional)">Sub-Editor
+                                                            (sub-Professional)</option>
+                                                        <option value="Superintendent Of Press">Superintendent Of Press
+                                                        </option>
+                                                        <option value="Suprintendent Of Press (Photo/Lithography)">
+                                                            Suprintendent Of Press (Photo/Lithography)</option>
+                                                        <option value="Survey Draughtsman">Survey Draughtsman</option>
+                                                        <option value="Surveyor">Surveyor</option>
+                                                        <option value="Tailor">Tailor</option>
+                                                        <option value="Technical Assistant (Architecture)">Technical
+                                                            Assistant (Architecture)</option>
+                                                        <option value="Technical Assistant (Civil)">Technical Assistant
+                                                            (Civil)</option>
+                                                        <option value="Technical Assistant (Mechanical)">Technical
+                                                            Assistant (Mechanical)</option>
+                                                        <option value="Technical Assistant (Water Enginnring)">Technical
+                                                            Assistant (Water Enginnring)</option>
+                                                        <option value="Technical Officer (Architecture)">Technical
+                                                            Officer (Architecture)</option>
+                                                        <option value="Technical Officer (Building)">Technical Officer
+                                                            (Building)</option>
+                                                        <option value="Technical Officer (Civil)">Technical Officer
+                                                            (Civil)</option>
+                                                        <option value="Technical Officer (Electrical)">Technical Officer
+                                                            (Electrical)</option>
+                                                        <option value="Technical Officer (Exploration)">Technical
+                                                            Officer (Exploration)</option>
+                                                        <option value="Technical Officer (Highways)">Technical Officer
+                                                            (Highways)</option>
+                                                        <option value="Technical Officer (Industrial)">Technical Officer
+                                                            (Industrial)</option>
+                                                        <option value="Technical Officer (Mining)">Technical Officer
+                                                            (Mining)</option>
+                                                        <option value="Technical Officer (Survey)">Technical Officer
+                                                            (Survey)</option>
+                                                        <option value="Technical Officer (Textile)">Technical Officer
+                                                            (Textile)</option>
+                                                        <option value="Technical Officer (Town Planning)">Technical
+                                                            Officer (Town Planning)</option>
+                                                        <option value="Technical Officer( Water Resources)">Technical
+                                                            Officer( Water Resources)</option>
+                                                        <option value="Tecnical Assistant (Electrical)">Tecnical
+                                                            Assistant (Electrical)</option>
+                                                        <option value="Tourism Guide">Tourism Guide</option>
+                                                        <option value="Tourism Officer">Tourism Officer</option>
+                                                        <option value="Town Planning Assistant">Town Planning Assistant
+                                                        </option>
+                                                        <option value="Town Planning Officer">Town Planning Officer
+                                                        </option>
+                                                        <option
+                                                            value="Tractor Driver/Tractor Driver-Mechanic/Articulated Vehicle Driver">
+                                                            Tractor Driver/Tractor Driver-Mechanic/Articulated Vehicle
+                                                            Driver</option>
+                                                        <option value="Trade Officer">Trade Officer</option>
+                                                        <option value="Tutor">Tutor</option>
+                                                        <option value="Vehicle Inspection Assistant Cadre">Vehicle
+                                                            Inspection Assistant Cadre</option>
+                                                        <option value="VEHICLE INSPECTION OFFICERS">VEHICLE INSPECTION
+                                                            OFFICERS</option>
+                                                        <option value="Vehicle Inspection Superintendent Cadre">Vehicle
+                                                            Inspection Superintendent Cadre</option>
+                                                        <option value="Veterinary Consultant">Veterinary Consultant
+                                                        </option>
+                                                        <option value="Veterinary Lab. Technologist">Veterinary Lab.
+                                                            Technologist</option>
+                                                        <option value="Veterinary Officer">Veterinary Officer</option>
+                                                        <option value="Veternary Laboratory Assistant">Veternary
+                                                            Laboratory Assistant</option>
+                                                        <option value="Washerman">Washerman</option>
+                                                        <option value="Watchman">Watchman</option>
+                                                        <option
+                                                            value="Water Engineering / Water Resources Engineering / Hydrological Engineer">
+                                                            Water Engineering / Water Resources Engineering /
+                                                            Hydrological Engineer</option>
+                                                        <option value="Works Superintendent">Works Superintendent
+                                                        </option>
+                                                        <option value="X-ray Technician">X-ray Technician</option>
+                                                        <option value="Youth Development Assistant">Youth Development
+                                                            Assistant</option>
+                                                        <option value="Youth Development Officer">Youth Development
+                                                            Officer</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_5">
+                                                <div class="form-group">
+                                                    <label>*Grade Level</label>
+                                                    <input type="text" id="grade" class="form-control"
+                                                        placeholder="Grade Level">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_6">
+                                                <div class="form-group">
+                                                    <label>*Date of first Appointment</label>
+                                                    <input type="text" id="dap" class="form-control"
+                                                        placeholder="Date of first Appointment"
+                                                        onfocus="(this.type='date')">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="pub_7">
+                                                <div class="form-group">
+                                                    <label>Date of Retirement</label>
+                                                    <input type="text" id="dret" class="form-control"
+                                                        placeholder="Date of Retirement" readonly>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="infor_1">
+                                                <div class="form-group">
+                                                    <label>Job Title</label>
+                                                    <input type="text" id="job" class="form-control"
+                                                        placeholder="Job Title">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>NIN</label>
+                                                    <input type="text" id="nin" class="form-control" placeholder="NIN"
+                                                        maxlength="11">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 d-none orin">
+                                                <div class="form-group">
+                                                    <label id="ori_">Ondo State Residency Number (ORIN)</label>
+                                                    <input type="text" id="orin" class="form-control"
+                                                        placeholder="Ondo State Residency Number (ORIN)" required
+                                                        maxlength="10">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="bhcp_">
+                                                <div class="form-group">
+                                                    <label>*Category</label>
+                                                    <select class="form-control custom-select " id="citiz">
+                                                        <option value="" selected disabled>*Category
+                                                        </option>
+
+                                                        <!-- <option value="Children Under 5Yrs">Children Under 5Yrs
+                                                            </option>
+                                                            <option value="Female Reproductive (15-45 Yrs)">Female
+                                                                Reproductive (15-45 Yrs)</option>
+                                                            <option value="Aged (85 Yrs above)">Aged (85 Yrs above)
+                                                            </option>
+                                                            <option value="Disabled">Disabled</option>
+                                                            <option value="Others (Specify)">Others (Specify)</option> -->
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="npreg_">
+                                                <div class="form-group">
+                                                    <label>Number of previous pregnancies</label>
+                                                    <select class="form-control custom-select " id="npreg">
+                                                        <option value="" selected disabled>Number of previous
+                                                            pregnancies
+                                                        </option>
+                                                        <option value="0">0</option>
+                                                        <option value="1">1</option>
+                                                        <option value="2">2</option>
+                                                        <option value="3">3</option>
+                                                        <option value="4">4</option>
+                                                        <option value="5">5</option>
+                                                        <option value="6">6</option>
+                                                        <option value="7">7</option>
+                                                        <option value="8">8</option>
+                                                        <option value="9">9</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="bhcp_1">
+                                                <div class="form-group">
+                                                    <label>Blood Group</label>
+                                                    <select class="form-control custom-select " id="bldg">
+                                                        <option value="" selected disabled>Blood Group
+                                                        </option>
+                                                        <option value="A+">A+</option>
+                                                        <option value="A-">A-</option>
+                                                        <option value="B+">B+</option>
+                                                        <option value="B-">B-</option>
+                                                        <option value="AB+">AB+</option>
+                                                        <option value="AB-">AB-</option>
+                                                        <option value="O+">O+</option>
+                                                        <option value="O-">0-</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="bhcp_2">
+                                                <div class="form-group">
+                                                    <label>Genotype</label>
+                                                    <select class="form-control custom-select " id="geno">
+                                                        <option value="" selected disabled>Genotype
+                                                        </option>
+                                                        <option value="AA">AA</option>
+                                                        <option value="AC">AC</option>
+                                                        <option value="AS">AS</option>
+                                                        <option value="CC">CC</option>
+                                                        <option value="SC">SC</option>
+                                                        <option value="SS">SS</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3 hidden" id="bhcp_3">
+                                                <div class="form-group">
+                                                    <label>*Settlement</label>
+                                                    <select class="form-control custom-select " id="settle">
+                                                        <option value="" selected disabled>*Settlement
+                                                        </option>
+                                                        <option value="Urban">Urban</option>
+                                                        <option value="Rural">Rural</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-lg-12" id="nhs_">
+                                                <p class="mt-1">Are you on the National Health Insurance Scheme?</p>
+                                                <div class="d-inline-block custom-control custom-radio mr-1 mt-1">
+                                                    <input type="radio" class="custom-control-input" name="nhis"
+                                                        id="nhis1" value="true">
+                                                    <label class="custom-control-label" for="nhis1">Yes</label>
+                                                </div>
+                                                <div class="d-inline-block custom-control custom-radio mr-1 mt-1">
+                                                    <input type="radio" class="custom-control-input" name="nhis"
+                                                        id="nhis2" value="false">
+                                                    <label class="custom-control-label" for="nhis2">No</label>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-lg-12">
+                                                <hr>
+                                                <h5 class="text-muted mt-2 mb-1">Medical History: Tick all
+                                                    pre-existing
+                                                    conditions that applies</h5>
+                                            </div>
+                                            <div class="col-lg-12" id="medCond">
+                                                <span
+                                                    class="feather icon-refresh-cw icon-spin text-left font-medium-3"></span>
+                                            </div>
+                                            <div class="col-lg-12" id="surg_">
+                                                <div class="form-group mt-2">
+                                                    <label>Surgical History</label>
+                                                    <input type="text" id="surg" class="form-control"
+                                                        placeholder="Surgical History">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-12">
+                                                <hr>
+                                                <h5 class="text-muted mt-2 mb-1">Next of Kin Information</h5>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*Last Name</label>
+                                                    <input type="text" id="noklname" class="form-control"
+                                                        placeholder="*Last Name" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*First Name</label>
+                                                    <input type="text" id="nokfname" class="form-control"
+                                                        placeholder="*First Name" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>Other Name</label>
+                                                    <input type="text" id="nokoname" class="form-control"
+                                                        placeholder="Other Name">
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*Relationship</label>
+                                                    <select class="form-control custom-select " id="rela" required>
+                                                        <option value="" selected disabled>Relationship</option>
+                                                        <option value="Father">Father</option>
+                                                        <option value="Mother">Mother</option>
+                                                        <option value="Uncle">Uncle</option>
+                                                        <option value="Aunty">Aunty</option>
+                                                        <option value="Brother">Brother</option>
+                                                        <option value="Sister">Sister</option>
+                                                        <option value="Nephew">Nephew</option>
+                                                        <option value="Niece">Niece</option>
+                                                        <option value="Son">Son</option>
+                                                        <option value="Daughter">Daughter</option>
+                                                        <option value="Grandfather">Grandfather</option>
+                                                        <option value="Grandmother">Grandmother</option>
+                                                        <option value="Others">Others</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <div class="form-group">
+                                                    <label>*Mobile Number</label>
+                                                    <input type="tel" id="nokphone" class="form-control"
+                                                        placeholder="Mobile Number" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-5">
+                                                <div class="form-group">
+                                                    <label>*Contact Address</label>
+                                                    <input type="text" id="nokaddress" class="form-control"
+                                                        placeholder="Contact Address" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-2">
+                                                <div class="form-group">
+                                                    <label>*State</label>
+                                                    <select class="form-control custom-select " id="state_" required>
+                                                        <option value="" selected disabled>State
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-2">
+                                                <div class="form-group">
+                                                    <label>*LGA</label>
+                                                    <select class="form-control custom-select " id="city_" required>
+                                                        <option value="" selected disabled>LGA
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-12 hidden" id="spc_">
+                                                <hr>
+                                                <h5 class="text-muted mt-2 mb-1">Spouse Information</h5>
+                                            </div>
+                                            <div class="col-lg-2 hidden" id="spc_1">
+                                                <div class="bImg ml-1">
+                                                    <img src="app-assets/images/portrait/user.png" id="Pic_">
+                                                </div>
+                                                <input class="file-upload" id="profPic_" type="file" accept="image/*" />
+                                                <label for="profPic_" class="btn btn-primary btn-block mt-1">Upload
+                                                    Picture</label>
+                                                <input type="hidden" id="img64_">
+                                                <button type="button" class="btn btn-secondary btn-block" id="webCam"
+                                                    data-toggle="modal" data-target="#webcamModal" data-typ="sp">Webcam
+                                                    Picture</button>
+                                            </div>
+                                            <div class="col-lg-10 hidden" id="spc_2">
+                                                <div class="row align-self-end">
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>*Last Name</label>
+                                                            <input type="text" id="spoulname" class="form-control"
+                                                                placeholder="Last Name">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>*First Name</label>
+                                                            <input type="text" id="spoufname" class="form-control"
+                                                                placeholder="First Name">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>*Date of Birth</label>
+                                                            <input type="text" id="spoudob" class="form-control"
+                                                                placeholder="Date of Birth"
+                                                                onfocus="(this.type='date')">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-1">
+                                                        <p class="mt-1">*Gender</p>
+                                                    </div>
+                                                    <div class="col-lg-2">
+                                                        <div
+                                                            class="d-inline-block custom-control custom-radio mr-1 mt-1">
+                                                            <input type="radio" class="custom-control-input"
+                                                                name="spougender" id="spougender1" value="Male">
+                                                            <label class="custom-control-label"
+                                                                for="spougender1">Male</label>
+                                                        </div>
+                                                        <div
+                                                            class="d-inline-block custom-control custom-radio mr-1 mt-1">
+                                                            <input type="radio" class="custom-control-input"
+                                                                name="spougender" id="spougender2" value="Female">
+                                                            <label class="custom-control-label"
+                                                                for="spougender2">Female</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>*Mobile Number</label>
+                                                            <input type="tel" id="spoumobile" class="form-control"
+                                                                placeholder="Mobile Number">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>*Provider LGA</label>
+                                                            <select class="form-control custom-select" id="spouprovLga">
+                                                                <option value="" selected disabled>Provider LGA
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>*Provider</label>
+                                                            <select class="form-control custom-select "
+                                                                id="spouprovider">
+                                                                <option value="" selected disabled>Provider
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>State of Origin</label>
+                                                            <select class="form-control custom-select " id="spoustate">
+                                                                <option value="" selected disabled>State of Origin
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>LGA of Origin</label>
+                                                            <select class="form-control custom-select " id="spoucity">
+                                                                <option value="" selected disabled>LGA of Origin
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>Nationality</label>
+                                                            <select class="form-control custom-select " id="spounation">
+                                                                <option value="" selected disabled>Nationality
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>Level of Education</label>
+                                                            <select class="form-control custom-select " id="spouedu">
+                                                                <option value="" selected disabled>Level of Education
+                                                                </option>
+                                                                <option value="None">None</option>
+                                                                <option value="Primary">Primary</option>
+                                                                <option value="Secondary">Secondary</option>
+                                                                <option value="Graduate">Graduate</option>
+                                                                <option value="Post Graduate">Post Graduate</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>Religion</label>
+                                                            <select class="form-control custom-select "
+                                                                id="spoureligion">
+                                                                <option value="" selected disabled>Religion
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>Tribe</label>
+                                                            <select class="form-control custom-select " id="spoutribe">
+                                                                <option value="" selected disabled>Tribe
+                                                                </option>
+                                                                <option value="Hausa">Hausa</option>
+                                                                <option value="Igbo">Igbo</option>
+                                                                <option value="Yoruba">Yoruba</option>
+                                                                <option value="Others">Others</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>Occupation</label>
+                                                            <select class="form-control custom-select " id="spouoccup">
+                                                                <option value="" selected disabled>Occupation
+                                                                </option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>NIN</label>
+                                                            <input type="text" id="spounin" class="form-control"
+                                                                placeholder="NIN" maxlength="11">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <div class="form-group">
+                                                            <label>Ondo State Residency Number (ORIN)</label>
+                                                            <input type="text" id="spouorin" class="form-control"
+                                                                placeholder="Ondo State Residency Number (ORIN)"
+                                                                maxlength="10">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-lg-9">
+                                                        <div class="form-group">
+                                                            <label>Surgical History</label>
+                                                            <input type="text" id="spousurg" class="form-control"
+                                                                placeholder="Surgical History">
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-lg-12">
+                                                        <hr>
+                                                        <h5 class="text-muted mt-2 mb-1">Medical History: Tick all
+                                                            pre-existing
+                                                            conditions that applies</h5>
+                                                    </div>
+                                                    <div class="col-lg-12" id="spoumedCond">
+                                                        <span
+                                                            class="feather icon-refresh-cw icon-spin text-left font-medium-3"></span>
+                                                    </div>
+
+
+                                                </div>
+                                            </div>
+
+
+                                            <div class="col-lg-12 chld_ hidden">
+                                                <hr>
+                                                <h5 class="text-muted mt-2 mb-1">Children Information</h5>
+                                            </div>
+                                            <div class="col-lg-12 hidden" id="chld_">
+                                                <!-- <div class="row">
+                                                        <div class="col-lg-2">
+                                                            <div class="bImg ml-1">
+                                                                <img src="app-assets/images/portrait/user.png"
+                                                                    id="childImg_">
+                                                            </div>
+                                                            <input class="file-upload" id="childPic_" type="file"
+                                                                accept="image/*"  required/>
+                                                            <label for="childPic_"
+                                                                class="btn btn-primary btn-block mt-1">Upload
+                                                                Picture</label>
+                                                            <input type="hidden" id="child64_">
+                                                        </div>
+                                                        <div class="col-lg-10">
+                                                            <div class="row">
+                                                                <div class="col-lg-3">
+                                                                    <div class="form-group">
+                                                                        <input type="text" id="childlname_"
+                                                                            class="form-control" required
+                                                                            placeholder="Last Name">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-lg-3">
+                                                                    <div class="form-group">
+                                                                        <input type="text" id="childfname_"
+                                                                            class="form-control" required
+                                                                            placeholder="First Name">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-lg-2">
+                                                                    <div class="form-group">
+                                                                        <input type="date" id="childdob_"
+                                                                            class="form-control" required
+                                                                            placeholder="Date of Birth">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-lg-4">
+                                                                    <fieldset class="form-group">
+                                                                        <div class="custom-file">
+                                                                            <input type="file" class="custom-file-input"
+                                                                                id="childCert_" required>
+                                                                            <label class="custom-file-label"
+                                                                                for="childCert_">Upload Birth
+                                                                            Certificate</label>
+                                                                            <input type="hidden" id="childCert64_">
+                                                                        </div>
+                                                                    </fieldset>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                    </div> -->
+
+                                            </div>
+
+
+
+                                        </div>
+
+                                        <div class="form-actions right border-0">
+                                            <button type="button"
+                                                class="btn btn-warning mr-1 btn-cancel">Cancel</button>
+                                            <button type="submit"
+                                                class="btn btn-primary">&nbsp;&nbsp;&nbsp;Save&nbsp;&nbsp;&nbsp;</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="col-lg-12 hidden" id="vb">
+
+                    </div>
+
+                    <div class="col-lg-12 hidden" id="batch">
+                        <div class="card radius-20">
+                            <div class="card-header">
+                                <h3 class="card-title text-center w-100 mt-2">Upload Beneficiaries</h3>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-body pb-5 pl-5 pr-5">
+                                    <div class="row">
+                                        <div class="col-lg-3">
+                                            <fieldset class="form-group">
+                                                <div class="custom-file">
+                                                    <input type="file" class="custom-file-input" id="_upload"
+                                                        accept=".csv">
+                                                    <label class="custom-file-label" for="_upload">Select
+                                                        File</label>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+                                        <div class="col-lg-3">
+                                            <a href="upload-beneficiary-data-csv.csv"
+                                                class="btn btn-block btn-blue-grey">Download Sample File</a>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-5 hidden" id="upReport">
+                                        <div class="col-lg-3">
+                                            <h5 class="text-bold-600" id="tUp"></h5>
+                                        </div>
+                                        <div class="col-lg-3">
+                                            <h5 class="text-bold-600 text-success" id="tSuc"></h5>
+                                        </div>
+                                        <div class="col-lg-3">
+                                            <h5 class="text-bold-600 text-danger" id="tFai"></h5>
+                                        </div>
+                                        <div class="col-lg-3"><a href="" class="btn btn-block btn-danger hidden"
+                                                id="dFail" target="_blank">Download Failed Report</a></div>
+                                    </div>
+                                    <div class="hidden" id="bTable">
+                                        <button type="button" class="btn btn-grey-blue float-right m-2" id="_svProv"><i
+                                                class="feather icon-save"></i>Save
+                                            Beneficiaries</button>
+                                        <div class="table-responsive">
+                                            <table id="batchTable" class="table ">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Sr_No</th>
+                                                        <th>Name_Of_Hospital</th>
+                                                        <th>Category_Of_Hospital</th>
+                                                        <th>Hospital_Telephone_Number</th>
+                                                        <th>Email_Address</th>
+                                                        <th>Address</th>
+                                                        <th>LGA</th>
+                                                        <th>Ward</th>
+                                                        <th>Name_Of_Medical_Director</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="batchBody">
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <!-- END: Content-->
+
+
+    <div class="sidenav-overlay"></div>
+    <div class="drag-target"></div>
+
+    <!-- Add View Benef Modal -->
+    <div class="modal fade" id="viewBenefModal" tabindex="-1" role="dialog" aria-labelledby="viewBenefTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+            <div class="modal-content pr-2 pl-2">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">close</span>
+                    </button>
+                </div>
+
+                <div class="modal-body pt-1">
+                    <h3 class="card-title text-center w-100 mt-2">Beneficiary Information</h3>
+                    <div class="card radius-10">
+                        <div class="card-content">
+                            <div class="card-body pb-5 pl-5 pr-5">
+                                <div class="row">
+                                    <div class="col-lg-12">
+                                        <a href="javascript:;"
+                                            class="btn btn-sm btn-primary float-right btn-edit hidden">Edit</a>
+                                    </div>
+                                    <div class="col-lg-4 offset-4">
+                                        <div class="ml-1 text-center">
+                                            <img src="app-assets/images/portrait/user.png" id="_Picture"
+                                                class="users-avatar-shadow " height="150" width="150">
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <h5 id="vNames" class="text-center mb-1 mt-2"></h5>
+                                        <h5 id="vErl" class="text-center mb-1"></h5>
+                                        <h5 id="vPlan" class="text-center mb-1"></h5>
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <h4>Date of Birth</h4>
+                                        <h5 id="vDob" class="mb-1"></h5>
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <h4>Phone Number</h4>
+                                        <h5 id="vPn" class="mb-1"></h5>
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <h4>Email Address</h4>
+                                        <h5 id="vEm" class="mb-1"></h5>
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <h4>Address</h4>
+                                        <h5 id="vAddress" class="mb-1"></h5>
+                                    </div>
+                                    <div class="col-lg-12 hidden" id="bh">
+                                        <h4>BHCP No.</h4>
+                                        <h5 id="bh_" class="mb-1"></h5>
+                                    </div>
+                                </div>
+
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="card-title text-center w-100 mt-2">Next of Kin Information</h3>
+                    <div class="card radius-10">
+                        <div class="card-content">
+                            <div class="card-body pb-5 pl-5 pr-5">
+
+                                <div class="row">
+                                    <div class="col-lg-12">
+                                        <a href="javascript:;"
+                                            class="btn btn-sm btn-primary float-right btn-edit-nok hidden">Edit</a>
+                                    </div>
+                                    <div class="col-lg-3">
+                                        <h4>Name</h4>
+                                        <h5 class="mb-1" id="nokName"></h5>
+                                    </div>
+                                    <div class="col-lg-3">
+                                        <h4>Relationship</h4>
+                                        <h5 class="mb-1" id="nokRela"></h5>
+                                    </div>
+                                    <div class="col-lg-3">
+                                        <h4>Mobile</h4>
+                                        <h5 class="mb-1" id="nokMobile"></h5>
+                                    </div>
+                                    <div class="col-lg-3">
+                                        <h4>Address</h4>
+                                        <h5 class="mb-1" id="nokAddress"></h5>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <h3 class="card-title text-center w-100 mt-2">Dependant Information</h3>
+                    <div class="card radius-10">
+                        <div class="card-content">
+                            <div class="card-body pb-5 pl-5 pr-5">
+                                <div class="row hidden" id="noDepen">
+                                    <div class="col-lg-12">
+                                        <h5 class="text-center">No Dependants Found</h5>
+                                    </div>
+                                </div>
+
+                                <div id="depen">
+                                    <!-- <div class="row">
+                                                <div class="col-lg-2">
+                                                    <div class="ml-1 text-center">
+                                                        <img src="app-assets/images/portrait/user.png"
+                                                            class="users-avatar-shadow " height="70"
+                                                            width="70">
+                                                    </div>
+                                                </div>
+                                                <div class="col-lg-4">
+                                                    <h4>Name</h4>
+                                                    <h5 class="mb-1"></h5>
+                                                </div>
+                                                <div class="col-lg-3">
+                                                    <h4>Date of Birth</h4>
+                                                    <h5 class="mb-1"></h5>
+                                                </div>
+                                                <div class="col-lg-3">
+                                                    <h4>Phone Number</h4>
+                                                    <h5 class="mb-1"></h5>
+                                                </div>
+                                                <div class="col-lg-3 offset-2">
+                                                    <h4>Email Address</h4>
+                                                    <h5 class="mb-1"></h5>
+                                                </div>
+                                                <div class="col-lg-5">
+                                                    <h4>Address</h4>
+                                                    <h5 class="mb-1"></h5>
+                                                </div>
+                                            </div>
+                                            <hr> -->
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="card-title text-center w-100 mt-2">Payment Information</h3>
+                    <div class="card radius-10">
+                        <div class="card-content">
+                            <div class="card-body pb-5 pl-5 pr-5">
+                                <div class="row hidden" id="noPayment">
+                                    <div class="col-lg-12">
+                                        <h5 class="text-center">No Payments Found</h5>
+                                    </div>
+                                </div>
+                                <div id="payment"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Depen Modal -->
+    <div class="modal fade" id="updateDepenModal" tabindex="-1" role="dialog" aria-labelledby="updateDepenTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content pr-2 pl-2">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">close</span>
+                    </button>
+                </div>
+                <div class="modal-body pt-1">
+                    <div class="row">
+                        <div class="col-lg-10">
+                            <h4 class="modal-title font-weight-bold" id="updateDepenTitle" lang="en">
+                                Update Dependant</h4>
+                        </div>
+                        <div class="col-lg-2">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form class="mt-1" method="post" name="updateDepenForm" id="updateDepenForm">
+                        <div class="col-lg-6 offset-3">
+                            <div class="bImg ml-1">
+                                <img src="app-assets/images/portrait/user.png" id="_Pic_">
+                            </div>
+                            <input class="file-upload" id="_profPic_" type="file" accept="image/*" />
+                            <label for="_profPic_" class="btn btn-primary btn-block mt-1">Upload
+                                Picture</label>
+                            <input type="hidden" id="_img64_">
+                        </div>
+                        <div class="form-group">
+                            <label for="eDfn" lang="en">First Name</label>
+                            <input type="text" class="form-control mb-0" id="eDfn" placeholder="First Name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="eDsn" lang="en">Surname</label>
+                            <input type="text" class="form-control mb-0" id="eDsn" placeholder="Surname" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="eDdob" lang="en">Date of Birth</label>
+                            <input type="date" class="form-control mb-0" id="eDdob" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="eDmb" lang="en">Phone Number</label>
+                            <input type="tel" class="form-control mb-0" id="eDmb" placeholder="Phone Number" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="eDem" lang="en">Email Address</label>
+                            <input type="email" class="form-control mb-0" id="eDem" placeholder="Email Address"
+                                required>
+                        </div>
+                        <div class="mt-2 pt-1 pb-1 text-center">
+                            <button type="submit" class="btn btn-primary btn-lg btn-block" lang="en"
+                                id="sb">Update</button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View IDCard Modal -->
+    <div class="modal fade" id="viewIDModal" tabindex="-1" role="dialog" aria-labelledby="viewIDTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+            <div class="modal-content pr-2 pl-2">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">close</span>
+                    </button>
+                </div>
+                <div class="modal-body pt-1">
+                    <div class="row">
+                        <div class="col-lg-10">
+                            <h4 class="modal-title font-weight-bold" id="viewIDTitle" lang="en">
+                                View ID Cards</h4>
+                        </div>
+                        <div class="col-lg-2">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group col-lg-4">
+                            <label>Select Beneficiary</label>
+                            <select class="custom-select form-control w-100" id="benefID"
+                                data-placeholder="Select Beneficiary" required></select>
+                        </div>
+                        <div class="col-lg-2">
+                            <button type="button" class="btn btn-outline-google btn-block mt-2" lang="en"
+                                id="printID">Print Card</button>
+                        </div>
+
+                    </div>
+
+                    <div class="m-2 hidden" id="idCardPrintView"></div>
+
+                    <div class="row">
+                        <div class="col-lg-3"></div>
+                        <div class="col-lg-5" id="idCardView">
+                            <div id="id-card" class=" center-layout">
+                                <div class="card-center" id="idCardViewFront">
+                                    <div class="row">
+                                        <div class="row card-top mr-1 ml-1 flex-row">
+                                            <div class="col-lg-3 flex-column" style="padding-top: 10px"><img
+                                                    src="//odchc-his.org/administrator/app-assets/images/logo/huwe.png"
+                                                    class="img-fluid img-container w-75" id="img_L" /></div>
+                                            <div class="col-lg-6 flex-column">
+                                                <h4
+                                                    class="title mt-2 text-center white justify-content-center text-bold-700">
+                                                    ONDO STATE CONTRIBUTORY HEALTH COMMISSION</h4>
+                                            </div>
+                                            <div class="col-lg-3 flex-column"><img
+                                                    src="//odchc-his.org/administrator/app-assets/images/logo/logo.png"
+                                                    class="img-fluid img-container w-75 float-right" id="img_R" />
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-12">
+                                            <h3 class="mt-1 mr-1 text-right text-primary" id="idNo"></h3>
+                                        </div>
+
+                                        <div class="col-lg-4">
+                                            <div class="img-container m-1"><img
+                                                    src="//odchc-his.org/administrator/app-assets/images/portrait/avatar-s-1.png"
+                                                    class="img-fluid img-container pic-container" id="idImg"></div>
+                                        </div>
+
+                                        <div class="col-lg-8">
+                                            <h1 class="m-1 text-center text-dark font-weight-normal" id="idName">
+                                            </h1>
+                                            <h1 class="m-1 text-center text-primary" id="idPlan_"></h1>
+                                            <h3 class="m-1 text-center text-dark" id="idProv"></h3>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="to-bottom id-bottom">
+                                        <div class="row">
+                                            <div class="col-lg-4">
+                                                <p class="text-bold-500 mt-1 ml-1 text-left" id="idLGA"></p>
+                                            </div>
+                                            <div class="col-lg-5">
+                                                <p class="text-bold-500 mt-1 text-left" id="idPhn"></p>
+                                            </div>
+                                            <div class="col-lg-3">
+                                                <p class="text-bold-500 mt-1 mr-1 text-left" id="idGend"></p>
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <p class="dates text-left ml-1 text-bold-500" id="idIss"></p>
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <p class="dates text-left text-bold-500" id="idExp"></p>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                                <div class="card-center mt-1" id="idCardViewBack">
+                                    <div class="center-back">
+
+                                        <div class="row m-1 text-center">
+                                            <div class="col-lg-6">
+                                                <h5 class="mt-1 mb-2">The bearer whose name and photograph appears
+                                                    overleaf is a beneficiary of the Ondo State Contributory Health
+                                                    Scheme.</h5>
+                                                <h5 class="mb-2">If Found, please return to the address below:</h5>
+
+                                                <h5>ONDO STATE CONTRIBUTORY HEALTH COMMISSION,<br> State Secretariat
+                                                    Complex,<br>Alagbaka, Akure.</h5>
+
+                                                <img src="//odchc-his.org/administrator/app-assets/images/backgrounds/sign.png"
+                                                    class="img-fluid img-container w-50">
+                                                <h6 class="text-dark">Authorized Signature</h6>
+                                            </div>
+                                            <div class="col-lg-6 border-left-2 border-left-primary">
+                                                <img src="//odchc-his.org/administrator/app-assets/images/logo/logo.png"
+                                                    class="img-fluid img-container w-75">
+                                                <img src="" class="img-fluid img-container width-40-per" id="imgQR">
+                                                <br>
+
+                                            </div>
+                                        </div>
+                                        <div class="to-bottom back-bottom">
+                                            <div
+                                                class="row card-top mt-0 mr-0 ml-0 mb-n50 flex-row pt-2 pb-2 pl-1 pr-1">
+                                                <div class="col-lg-6 flex-column">
+                                                    <h4 class="white">www.odchc.on.gov.ng</h4>
+                                                    <h4 class="white">info@odchc.on.gov.ng</h4>
+                                                </div>
+                                                <div class="col-lg-2 flex-column">
+                                                    <h4 class="white mt-2 underline">Helplines:</h4>
+                                                </div>
+                                                <div class="col-lg-4 flex-column">
+                                                    <h4 class="white">02017004601</h4>
+                                                    <h4 class="white">02017004602</h4>
+                                                </div>
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="webcamModal" data-backdrop="static" data-keyboard="false" tabindex="-1"
+        aria-labelledby="webcamLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p><span id="errorMsg"></span></p>
+
+                    <div class="form-group mt-3 mb-1">
+                        <label>Select Camera</label>
+                        <select class="form-control custom-select " id="cam">
+                            <option value="" selected disabled>Select Camera</option>
+                        </select>
+                    </div>
+                    <!-- Stream video via webcam -->
+                    <div class="video-wrap w-100">
+                        <video id="video" playsinline autoplay class="w-100"></video>
+                    </div>
+
+                    <!-- Trigger canvas web API -->
+                    <div class="controller">
+                        <button id="snap" class="btn btn-outline-instagram">Capture</button>
+                    </div>
+
+                    <!-- Webcam video snapshot -->
+                    <canvas id="canvas" width="320" height="240"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="sms" data-backdrop="static" data-keyboard="false" tabindex="-1"
+        aria-labelledby="smsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" id="smsForm" name="smsForm">
+                        <div class="row">
+                            <div class="form-group col-lg-6">
+                                <label>Enrolled Between</label>
+                                <input type="date" id="sdate" name="sdate" class="form-control">
+                            </div>
+
+                            <div class="form-group col-lg-6">
+                                <label>And</label>
+                                <input type="date" id="edate" name="edate" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <select class="form-control custom-select" id="smslga" required>
+                                <option value="" selected disabled>LGA
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <select class="form-control custom-select" id="smsward" required>
+                                <option value="" selected disabled>Ward
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <select class="form-control custom-select" id="smsprovider" required>
+                                <option value="" selected disabled>Provider
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <select class="form-control custom-select" id="smsplan" required>
+                                <option value="" selected disabled>Plan
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="sms" lang="en">SMS Content</label>
+                            <textarea class="form-control" required rows="4" id="smsText"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">&nbsp;&nbsp;&nbsp;Send&nbsp;&nbsp;&nbsp;</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="renewModal" data-backdrop="static" data-keyboard="false" tabindex="-1"
+        aria-labelledby="renewLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" id="renewForm" name="renewForm">
+                        <input type="hidden" id="renewID">
+                        <div class="form-group">
+                            <label for="renewDate" lang="en">Expiry Date</label>
+                            <input type="date" id="renewDate" name="renewDate" class="form-control">
+                        </div>
+                        <button type="submit"
+                            class="btn btn-primary">&nbsp;&nbsp;&nbsp;Submit&nbsp;&nbsp;&nbsp;</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="profModal" data-backdrop="static" data-keyboard="false" tabindex="-1"
+        aria-labelledby="profLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6>Upload Profoma Data</h6>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <a href="member_proforma_data.csv" class="btn btn-block btn-blue-grey mb-2">Download Sample File</a>
+
+                    <form method="POST" id="profForm" name="profForm">
+                        <input type="hidden" id="prof64">
+                        <fieldset class="form-group">
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" id="profFile" accept=".csv">
+                                <label class="custom-file-label" for="profFile">Select
+                                    File</label>
+                            </div>
+                        </fieldset>
+                        <div class="row mt-5 hidden" id="upReport_">
+                            <div class="col-lg-12">
+                                <h5 class="text-bold-600" id="tUp_"></h5>
+                            </div>
+                            <div class="col-lg-12">
+                                <h5 class="text-bold-600 text-success" id="tSuc_"></h5>
+                            </div>
+                            <div class="col-lg-12">
+                                <h5 class="text-bold-600 text-danger" id="tFai_"></h5>
+                            </div>
+                            <div class="col-lg-12"><a href="" class="btn btn-block btn-danger hidden" id="dFail_"
+                                    target="_blank">Download Failed Report</a></div>
+                        </div>
+                        <button type="submit"
+                            class="btn btn-primary">&nbsp;&nbsp;&nbsp;Submit&nbsp;&nbsp;&nbsp;</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BEGIN: Footer-->
+    <footer class="footer footer-static navbar-border footer-transparent">
+        <p class="clearfix text-muted text-sm-center mb-0 px-2">
+            <span class="float-md-left d-block d-md-inline-block">&copy; 2026 <strong>ODCHC</strong> &mdash; Health
+                Insurance System</span>
+            <span class="float-md-right d-none d-lg-block"><img src="app-assets/images/logo/footer.png"
+                    width="40" /></span>
+        </p>
+    </footer>
+    <!-- END: Footer-->
+
+
+    <!-- BEGIN: Vendor JS-->
+    <script src="app-assets/vendors/js/vendors.min.js"></script>
+    <!-- BEGIN Vendor JS-->
+
+    <!-- BEGIN: Page Vendor JS-->
+    <script src="app-assets/vendors/js/ui/prism.min.js"></script>
+    <script src="app-assets/vendors/js/extensions/sweetalert2.all.min.js"></script>
+    <script src="app-assets/vendors/js/extensions/polyfill.min.js"></script>
+    <script src="app-assets/vendors/js/extensions/toastr.min.js"></script>
+    <script src="app-assets/js/scripts/extensions/date.js"></script>
+    <script src="app-assets/js/scripts/extensions/html2canvas.min.js"></script>
+    <script src="app-assets/js/scripts/extensions/printThis.js"></script>
+    <script src="app-assets/vendors/js/tables/datatable/datatables.min.js"></script>
+    <script src="app-assets/vendors/js/tables/datatable/dataTables.responsive.min.js"></script>
+    <script src="app-assets/vendors/js/tables/datatable/buttons.bootstrap4.min.js"></script>
+    <script src="app-assets/vendors/js/forms/select/select2.full.min.js"></script>
+    <script src="app-assets/vendors/js/forms/extended/inputmask/jquery.inputmask.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/datetime/1.0.3/js/dataTables.dateTime.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.5.3/jspdf.min.js"></script>
+    <script type="text/javascript" src="https://html2canvas.hertzen.com/dist/html2canvas.js"></script>
+    <!-- END: Page Vendor JS-->
+
+    <!-- BEGIN: Theme JS-->
+    <script src="app-assets/js/core/app-menu.min.js"></script>
+    <script src="app-assets/js/core/app.min.js"></script>
+    <!-- END: Theme JS-->
+
+    <!-- BEGIN: Page JS-->
+    <!-- END: Page JS-->
+    <script src="app-assets/js/core/config.js?random=6a5a0da4dec3b"></script>
+
+</body>
+<!-- END: Body-->
+
+</html>

@@ -19,7 +19,10 @@ from app.enrollment.services import (
     FormServices,
     FormEnrollmentState,
     FormUpdateResult,
+    BatchIdCardJobResult, 
+    BatchIdCardDownloadResult
 )
+from app.enrollment.utils import serialize_validation_errors
 from app.enrollment.dataloader import get_loader
 from pydantic import ValidationError
 from app.enrollment import enrollment_bp
@@ -64,7 +67,7 @@ def batch_post():
             facility_no=request.form.get("facility_no"),
         )
     except ValidationError as e:
-        return jsonify({"success": False, "errors": e.errors(include_url=False)}), 400
+        return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
 
     result: BatchJobResult = BatchServices().create_job(
         lga_no=uploader.lga_no,
@@ -111,26 +114,18 @@ def batch_post():
 def download_batch_forms(batch_id: str):
     batch_service = BatchServices()
     status_filter = request.args.get("status", None)
-    download_type = request.args.get("type", None)
 
-    if not download_type:
-        return jsonify({"success": False, "msg": "Please select a download type"}), 400
+    result = batch_service.download_forms(batch_id, status_filter)
+    if result.status == "invalid":
+        return jsonify({"success": False, "msg": result.msg}), 400
+    elif result.status == "404":
+        return jsonify({"success": False, "msg": result.msg}), 404
 
-    if download_type.strip().lower() == 'form':
-        result = batch_service.download_forms(batch_id, status_filter)
-        if result.status == "invalid":
-            return jsonify({"success": False, "msg": result.msg}), 400
-        elif result.status ==  "404":
-            return jsonify({"success": False, "msg": result.msg}), 404
-
-        response = Response(result.generator, mimetype="application/zip")
-        response.headers['Content-Disposition'] = f'attachment; filename={result.filename}'
-        return response
-    elif download_type.strip().lower() =="idcard":
-        result = batch_service.start_id_card_generation()
-        # handle return
-    else:
-        return jsonify({"success": False, "msg": f"Invalid download type {download_type}. Use 'form' or 'idcard' as type"}), 400
+    response = Response(result.generator, mimetype="application/zip")
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename={result.filename}"
+    )
+    return response
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/forms")
@@ -167,18 +162,6 @@ def get_batch_forms(batch_id: str):
             "has_more": len(forms) == count,
         }
     )
-
-
-@enrollment_bp.get("/batches/<string:batch_id>")
-def get_batch_id(batch_id: str):
-    batch_service = BatchServices()
-    data = batch_service.get_breakdown_stat(batch_id)
-    if not data:
-        return (
-            jsonify({"success": False, "msg": "No batch exists with the given id"}),
-            404,
-        )
-    return jsonify({"success": True, "msg": "", "data": data})
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/progress")
@@ -278,7 +261,105 @@ def get_batch_progress_stream(batch_id: str):
         },
     )
 
-def _serve_form_file(asset_id: str, as_attachment:bool = False):
+@enrollment_bp.post("/batches/<string:batch_id>/idcards")
+def start_id_card_generation(batch_id: str):
+    batch_service = BatchServices()
+    result: BatchIdCardJobResult = batch_service.start_id_card_generation(batch_id)
+
+    if result.status == "invalid":
+        return jsonify({"success": False, "msg": result.msg}), 404
+    if result.status == "no_idcard":
+        return jsonify({"success": False, "msg": result.msg}), 400
+
+    return jsonify({
+        "success": True,
+        "msg": result.msg,
+        "progress_url": url_for("enrollment.get_idcard_progress_stream", batch_id=batch_id),
+    }), 202
+
+
+@enrollment_bp.get("/batches/<string:batch_id>/idcards/progress")
+def get_idcard_progress_stream(batch_id: str):
+    batch_service = BatchServices()
+
+    @stream_with_context
+    def generate():
+        batch = batch_service.get(batch_id)
+        if batch is None:
+            yield f"event: error\ndata: {json.dumps({'message': 'Batch not found'})}\n\n"
+            return
+
+        kv_status_key = f"batch_idcard_status:{batch_id}"
+        current_status = (kv.hget(kv_status_key, "status") or "").lower()
+
+        if current_status == "completed":
+            snapshot = kv.hgetall(kv_status_key)
+            yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
+            return
+
+        if not current_status:
+            yield f"event: error\ndata: {json.dumps({'message': 'No generation job has started for this batch'})}\n\n"
+            return
+
+        subscriber = kv.pubsub()
+        try:
+            subscriber.subscribe(f"channel:batch_idcard:{batch_id}")
+
+            snapshot = kv.hgetall(kv_status_key)
+            yield f"event: status\ndata: {json.dumps(snapshot)}\n\n"
+
+            while True:
+                message = subscriber.get_message(ignore_subscribe_messages=True, timeout=15)
+                if message is None:
+                    yield ": heartbeat\n\n"
+                    continue
+
+                if message is not None and message["type"] == "message":
+                    payload = json.loads(message["data"])
+                    if payload.get("type") == "finished":
+                        snapshot = kv.hgetall(kv_status_key)
+                        yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
+                        break
+                    yield f"event: status\ndata: {json.dumps(payload)}\n\n"
+                    continue
+
+                snapshot = kv.hgetall(kv_status_key)
+                yield f"event: status\ndata: {json.dumps(snapshot)}\n\n"
+                if (snapshot.get("status") or "").lower() == "completed":
+                    yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
+                    break
+        except Exception:
+            yield f"event: error\ndata: {json.dumps({'message': 'Connection lost'})}\n\n"
+        finally:
+            subscriber.unsubscribe(f"channel:batch_idcard:{batch_id}")
+            subscriber.close()
+
+    return Response(generate(), mimetype="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+
+
+
+
+@enrollment_bp.get("/batches/<string:batch_id>/idcards/download")
+def download_idcards(batch_id: str):
+    result: BatchIdCardDownloadResult = batch_service.id_card_download(batch_id)
+
+    if result.status == "invalid":
+        return jsonify({"success": False, "msg": result.msg}), 404
+    if result.status == "no_job":
+        return jsonify({"success": False, "msg": result.msg}), 409
+
+    response = Response(result.generator, mimetype="application/zip")
+    response.headers["Content-Disposition"] = f'attachment; filename="{result.filename}"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+
+def _serve_form_file(asset_id: str, as_attachment: bool = False):
     form_service = FormServices()
     form = form_service.get(asset_id)
     if not form:
@@ -288,7 +369,7 @@ def _serve_form_file(asset_id: str, as_attachment:bool = False):
             os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
             os.path.basename(form.img_path),
             max_age=86400,
-        )
+            )
     else:
         return send_from_directory(
             os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
@@ -297,11 +378,11 @@ def _serve_form_file(asset_id: str, as_attachment:bool = False):
         )
 
 
-
 @enrollment_bp.get("/asset/form/<string:asset_id>")
 def get_form_asset(asset_id: str):
-    return _serve_form_file(asset_id= asset_id, as_attachment=False)
-    
+    return _serve_form_file(asset_id=asset_id, as_attachment=False)
+
+
 @enrollment_bp.get("/asset/passport/<string:asset_id>")
 def get_passport_asset(asset_id: str):
     form_service = FormServices()
@@ -358,7 +439,8 @@ def update_form_passport(form_id: str):
         passport = request.files.get("passport")
         uploader = FormPassPortUploader(passport=passport)
     except ValidationError as e:
-        return jsonify({"success": False, "errors": e.errors(include_url=False)}), 400
+        return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
+
     result = form_service.update_passport(uploader.passport, form)
     if result.success == False:
         return (jsonify({"success": False, "msg": result.msg}), 500)
@@ -370,7 +452,7 @@ def update_form(form_id: str):
     try:
         updater = FormUpdater(**request.get_json(silent=True) or {})
     except ValidationError as e:
-        return jsonify({"success": False, "msg": e.errors(include_url=False)}), 400
+        return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
     form_service = FormServices()
     result: FormUpdateResult = form_service.update_form(form_id, updater)
 
@@ -485,20 +567,29 @@ def reprocess_form(form_id: str):
     process_image_pipeline.delay(form.uuid, is_batch=False)
     return jsonify({"success": True, "msg": "Form queued for reprocessing"}), 202
 
-@enrollment_bp.get("/form/<string:form_id>/download")
-def download_form(form_id: str):
-    return _serve_form_file(form_id, as_attachment=True)
-
-
 
 @enrollment_bp.get("/form/<string:form_id>/download")
 def download_form_idcard(form_id: str):
-    type = request.args.get()
+    type = request.args.get("type", None)
     form_service = FormServices()
-    result = form_service.download_id_card(form_id)
-    if result.status == "invalid":
-        return jsonify({"success": False, "msg": "No form with the given id"}), 404
-    return send_file(result.file, mimetype="application/jpeg", as_attachment=True, download_name = result.download_name)
+    if type == "img":
+        return _serve_form_file(form_id, as_attachment=True)
+    elif type == "idcard":
+        result = form_service.download_form_idcard(form_id)
+        if result.status == "invalid":
+            return jsonify({"success": False, "msg": result.msg}), 404
+        elif result.status == "not_enrolled":
+            return jsonify({"success": False, "msg": result.msg}), 400
+        elif result.status == "failed":
+            return jsonify({"success": False, "msg": result.msg}), 500
+        elif result.status == "success":
+            return send_file(
+                result.file,
+                as_attachment=True,
+                download_name=result.filename,
+            )
+    else:
+        return (jsonify({'success': False, "msg": "Invalid download type"}), 400)
 
 
 @enrollment_bp.get("/lgas")

@@ -2,12 +2,11 @@ import os
 import zipfile
 import tempfile
 import uuid as uuid_tools
-import threading
 import sqlalchemy as sa
 from werkzeug.utils import secure_filename
 from typing import Optional
 import json
-
+from app.enrollment.utils import generate_id_card_path
 from app import celery_app, kv, db
 from app.enrollment.image_processing import (
     is_image_too_blurry,
@@ -17,13 +16,21 @@ from app.enrollment.image_processing import (
 from app.enrollment.utils import is_image_extension
 from app.enrollment.models import Form, FormStatus, BatchStatus, Batch
 from app.enrollment.normalization import normalize_form_object
+from app.enrollment.his_client import HISClient
+from app.enrollment.idcard.generator import IdCardGenerator, ProgressEvent
 
 from flask import current_app
-from app.enrollment.llm.clients import AllKeysExhausted, gemini_client
+from app.enrollment.llm.clients import (
+    AllKeysExhausted,
+    gemini_client,
+    ServerConnectionError,
+)
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from celery import group
+from celery import group, chord
 from time import perf_counter
 import cv2
+import traceback
+from datetime import datetime
 
 
 @celery_app.task
@@ -187,10 +194,15 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
             _finalize_image_processing(batch_name, batch_id, form)
 
     except AllKeysExhausted as e:
+        traceback.print_exc()
         countdown = min(45 * (self.request.retries + 1), 5 * 60)
-        raise self.retry(countdown=15 * 60)
+        raise self.retry(countdown=countdown)
+    except ServerConnectionError:
+        countdown = min(60 * 3 * (self.request.retries + 1), 15 * 60)
+        raise self.retry(countdown=countdown)
 
     except Exception as e:
+        traceback.print_exc()
         db.session.rollback()
         active_form = db.session.scalar(sa.select(Form).where(Form.uuid == form_id))
         try:
@@ -199,6 +211,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
                 active_form.error_message = str(e)
                 db.session.commit()
         except Exception:
+            traceback.print_exc()
             db.session.rollback()
         if is_batch and active_form:
             _finalize_image_processing(batch_name, batch_id, active_form)
@@ -217,3 +230,122 @@ def reclaim_leased_api_keys():
             removed = kv.lrem(LEASE, 1, key)
             if removed:
                 kv.rpush(KEY_POOL, key)
+
+
+@celery_app.task
+def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
+    kv_status_key = f"batch_idcard_status:{batch_id}"
+    try:
+        client = HISClient()
+        result = client.fetch_id_details_from_his(enroll_no)
+        outcome = result.success
+    except Exception as e:
+        result = None
+        outcome = False
+
+    fetched = int(kv.hincrby(kv_status_key, "fetched", 1))
+    kv.publish(
+        f"channel:batch_idcard:{batch_id}",
+        json.dumps({"type": "fetch_progress", "fetched": fetched, "enrollee_no": enroll_no, "success": outcome}),
+    )
+    return (path, result) if result else None
+
+@celery_app.task
+def generate_id_card(result, batch_id):
+    kv_batch_id_name = f"batch_idcard:{batch_id}"
+    kv_batch_id_status = f"batch_idcard_status:{batch_id}"
+
+    kv.hset(kv_batch_id_status, "status", "generating")
+    to_generate = []
+    for res in result:
+        if res is None:
+            kv.hincrby(kv_batch_id_status, "failed", 1)
+            continue
+        path, cur = res
+
+        if not cur.success:
+            kv.hincrby(kv_batch_id_status, "failed", 1)
+            continue
+        to_generate.append((path, cur.payload))
+
+    def publish_update_idcard_status(event: ProgressEvent):
+        completed = int(kv.hincrby(kv_batch_id_status, "completed", 1))
+        success = int(kv.hget(kv_batch_id_status, "success") or 0)
+        failed = int(kv.hget(kv_batch_id_status, "failed") or 0)
+        if event.success:
+            success = int(kv.hincrby(kv_batch_id_status, "success", 1))
+            kv.sadd(kv_batch_id_name, event.path)
+        else:
+            failed = int(kv.hincrby(kv_batch_id_status, "failed", 1))
+
+        payload = {
+            "type": "status",
+            "completed": completed,
+            "failed": failed,
+            "success": success,
+        }
+        kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
+
+    generator = IdCardGenerator()
+    generator.create_id_card_sync(to_generate, publish_update_idcard_status)
+    kv.hset(kv_batch_id_status, "status", "completed")
+    payload = {"type": "finished"}
+    kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
+    kv.expire(kv_batch_id_name, 86400)
+    kv.expire(kv_batch_id_status, 86400)
+
+
+@celery_app.task
+def start_id_card_generate_job(batch_id: str):
+    batch = db.session.scalar(
+        sa.select(Batch).where(Batch.uuid == batch_id)
+    )
+    if not batch:
+        return
+    forms = db.session.scalars(
+        sa.select(Form).where(
+            Form.batch_id == batch.id,
+            Form.status == FormStatus.ENROLLED,
+            Form.enrollee_number.isnot(None),
+        )
+    ).all()
+    kv_batch_id_name = f"batch_idcard:{batch_id}"
+    kv_batch_id_status = f"batch_idcard_status:{batch_id}"
+
+    if not forms:
+        return
+
+    already_succeed = 0
+    task_headers = []
+    for form in forms:
+        id_path = generate_id_card_path(
+            form.uuid, form.firstname, form.othername, form.surname
+        )
+
+        if os.path.exists(id_path):
+            kv.sadd(kv_batch_id_name, id_path)
+            already_succeed += 1
+            continue
+
+        enrollee_number = form.enrollee_number
+        payload = {"path": id_path, "enroll_no": enrollee_number}
+        task_headers.append(get_his_id_card_payload(**payload))
+
+    kv.hset(
+        kv_batch_id_status,
+        mapping={
+            "total": len(forms),
+            "status": "fetching" if task_headers else "completed",
+            "success": already_succeed,
+            "completed": already_succeed,
+            "failed": 0,
+            "time_started": datetime.timestamp(datetime.now()),
+        },
+    )
+    
+    if task_headers:
+        callback = generate_id_card.s(batch_id)
+        chord(task_headers)(callback)
+    else:
+        payload = {"type": "finished"}
+        kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
