@@ -22,11 +22,8 @@ _QR_CACHE_LOCK = asyncio.Lock()
 
 @dataclass
 class ProgressEvent:
-    total: int
-    completed: int
-    succeeded: int
-    failed: int
-    message: str
+    success: bool
+    path: str
 
 
 class IdCardGenerator:
@@ -35,37 +32,24 @@ class IdCardGenerator:
         self.concurrency = concurrency
         self.http_timeout = http_timeout
 
-    async def fetch_photo_asset(
-        self, client: httpx.AsyncClient, resource_path: str
-    ) -> str:
-        try:
-            res = await client.get(resource_path, timeout=self.http_timeout)
-            if res.status_code < 400:
-                encoded = base64.b64encode(res.content).decode("utf-8")
-                mimetype, _ = guess_type(resource_path)
-                return f"data:{mimetype or 'application/octet-stream'};base64,{encoded}"
-        except Exception:
-            pass
-        return ""
-
     async def fetch_qr_code_asset(self, client: httpx.AsyncClient) -> str:
         global _QR_CACHE
 
-        if os.path.exists(QR_CODE_PATH):
-            return await asyncio.to_thread(self._read_local_qr)
 
         async with _QR_CACHE_LOCK:
             if _QR_CACHE is not None:
                 return _QR_CACHE
-            try:
-                res = await client.get(BHCPF_QR_CODE_URL, timeout=self.http_timeout)
-                if res.status_code < 400:
-                    encoded = base64.b64encode(res.content).decode("utf-8")
-                    mimetype, _ = guess_type(BHCPF_QR_CODE_URL)
-                    _QR_CACHE = f"data:{mimetype or 'image/png'};base64,{encoded}"
-                    return _QR_CACHE
-            except Exception:
-                pass
+        if os.path.exists(QR_CODE_PATH):
+            return await asyncio.to_thread(self._read_local_qr)
+        try:
+            res = await client.get(BHCPF_QR_CODE_URL, timeout=self.http_timeout)
+            if res.status_code < 400:
+                encoded = base64.b64encode(res.content).decode("utf-8")
+                mimetype, _ = guess_type(BHCPF_QR_CODE_URL)
+                _QR_CACHE = f"data:{mimetype or 'image/png'};base64,{encoded}"
+                return _QR_CACHE
+        except Exception:
+            pass
         return ""
 
     @staticmethod
@@ -120,10 +104,8 @@ class IdCardGenerator:
         path: str,
         enrollee_data: Dict[str, Any],
     ) -> str:
-        photo_b64, qr_b64 = await asyncio.gather(
-            self.fetch_photo_asset(client, enrollee_data["pixUrl"]),
-            self.fetch_qr_code_asset(client),
-        )
+        photo_b64 = enrollee_data["passport_b64"]
+        qr_b64 = await self.fetch_qr_code_asset(client)
 
         await page.evaluate(
             """(data) => {
@@ -205,14 +187,7 @@ class IdCardGenerator:
                         for page in pages:
                             await page_pool.put(page)
 
-                        total = len(params)
-                        failed = 0
-                        succeed = 0
-                        completed = 0
-                        msg = ""
-
                         async def bound(index: int, path: str, data: Dict[str, Any]):
-                            nonlocal total, failed, succeed, completed, msg
                             async with sem:
                                 page = await page_pool.get()
                                 success = False
@@ -224,26 +199,16 @@ class IdCardGenerator:
                                         data,
                                     )
                                     success = True
-                                    msg = f'Id card generated for {(data["surname"] or "").upper()} {(data["middleName"] or " ")[0].upper()} {data["othername"].upper()}'
                                 except Exception as e:
-                                    msg = str(e)[:300]
                                     errors.append((path, e))
                                 finally:
                                     await page_pool.put(page)
-                                    completed += 1
-                                    if success:
-                                        succeed += 1
-                                    else:
-                                        failed += 1
                                     if callback:
-                                        callback(
+                                        await asyncio.to_thread(
+                                            callback,
                                             ProgressEvent(
-                                                total=total,
-                                                completed=completed,
-                                                succeeded=succeed,
-                                                failed=failed,
-                                                message=msg,
-                                            )
+                                                success=success, path=path
+                                            ),
                                         )
 
                         await asyncio.gather(
@@ -263,10 +228,7 @@ class IdCardGenerator:
             finally:
                 await browser.close()
 
-        if errors:
-            raise RuntimeError(f"{len(errors)} card(s) failed: {errors}")
-
-        return results  # type: ignore[return-value]
+        return results, errors  # type: ignore[return-value]
 
     def create_id_card_sync(
         self,

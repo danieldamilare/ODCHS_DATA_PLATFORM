@@ -51,6 +51,7 @@ class FormIdCardResult:
     status: Literal["invalid", "success", "not_enrolled", "failed"]
     msg: str
     file: Optional[str] = None
+    filename: Optional[str] = None
 
 
 class FormServices:
@@ -232,17 +233,22 @@ class FormServices:
                 "not_enrolled",
                 "You cannot generate ID card for this form. It either has no enrollee number or has not been enrolled. Please check the HIS site",
             )
-        path = generate_id_card_path(form.uuid)
+        path = generate_id_card_path(
+            form.uuid, form.firstname, form.othername, form.surname
+        )
         if os.path.exists(path):
             return FormIdCardResult("success", "Id successfully generated", path)
-        result = self.his_client.fetch_idcard_from_his(form.enrollee_number)
-        os.makedirs(path, exist_ok=True)
+        result = self.his_client.fetch_id_details_from_his(form.enrollee_number)
+        dir_name = os.path.dirname(path)
+        os.makedirs(dir_name, exist_ok=True)
 
         if not result.success:
             return FormIdCardResult("failed", result.msg)
-        id_card_generator = IdCardGenerator()
+        id_card_generator = IdCardGenerator(concurrency=1)
         try:
-            id_card_generator.create_id_card_sync((path, result.payload))
+            _, errors = id_card_generator.create_id_card_sync([(path, result.payload)])
         except Exception as e:
-            return FormIdCardResult("failed", str(e)[:300])
-        return FormIdCardResult("success", "Successfully Generated Id Card", path)
+            return FormIdCardResult("failed", "ID card generation failed")
+        filename = os.path.basename(path)
+
+        return FormIdCardResult("success", "Successfully Generated Id Card", path, filename)

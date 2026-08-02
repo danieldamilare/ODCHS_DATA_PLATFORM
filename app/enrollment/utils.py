@@ -4,6 +4,8 @@ from werkzeug.datastructures import FileStorage
 import io
 from typing import Union
 import base64
+from pydantic import ValidationError
+from flask import current_app
 
 
 def compute_hash(file: FileStorage):
@@ -36,3 +38,23 @@ def validate_zip_file(file: FileStorage) -> FileStorage:
         raise ValueError("Invalid ZIP file content structure")
 
     return file
+
+
+def serialize_validation_errors(e: ValidationError) -> str:
+    return "; ".join(err["msg"] for err in e.errors(include_url=False))
+
+
+def generate_id_card_path(uuid: str, first_name: str, other_name: str, surname: str):
+    filename = first_name
+    if other_name:
+        filename += "_" if filename else ""
+        filename += other_name
+    if surname:
+        filename += "_" if filename else ""
+        filename += surname
+    filename += "_" if filename else ""
+    filename += uuid
+    filename += ".png"
+
+    path = os.path.join(current_app.config["FORM_PATH"], "id_card", uuid, filename)
+    return path
