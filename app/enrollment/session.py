@@ -44,8 +44,17 @@ def get_his_session():
         }
     )
 
-    session.mount("http://", TimeoutHTTPAdapter())
-    session.mount("https://", TimeoutHTTPAdapter())
+    MAX_POOL_CONNECTIONS = 25
+    GLOBAL_TIMEOUT_SECONDS = 30
+
+    custom_adapter = TimeoutHTTPAdapter(
+        timeout=GLOBAL_TIMEOUT_SECONDS,
+        pool_connections=MAX_POOL_CONNECTIONS,
+        pool_maxsize=MAX_POOL_CONNECTIONS,
+    )
+
+    session.mount("http://", custom_adapter)
+    session.mount("https://", custom_adapter)
 
     _session = session
     return session

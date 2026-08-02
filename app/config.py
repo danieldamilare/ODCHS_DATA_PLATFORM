@@ -41,11 +41,19 @@ class Config:
     worker_reject_on_worker_lost = True
 
     broker_transport_options = {"visibility_timeout": 18000}
+    broker_connection_retry_on_startup = True
+
+    task_publish_retry = True
+    task_publish_retry_policy = {
+        "max_retries": 5,  # Try up to 5 times if Redis socket is flaky
+        "interval_start": 0.2,  # Start with a 200ms delay
+        "interval_step": 0.5,  # Progressively wait longer between attempts
+        "interval_max": 2.0,  # Cap retry intervals at 2 seconds max
+    }
 
     beat_schedule = {
         "reclaim-leased-keys-every-5-mins": {
             "task": "app.enrollment.tasks.reclaim_leased_api_keys",
             "schedule": 60.0 * 5,
-            "options": {"queue": "high_priority"},
         },
     }
