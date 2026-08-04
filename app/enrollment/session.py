@@ -51,6 +51,7 @@ def get_his_session():
         timeout=GLOBAL_TIMEOUT_SECONDS,
         pool_connections=MAX_POOL_CONNECTIONS,
         pool_maxsize=MAX_POOL_CONNECTIONS,
+        max_retries=4
     )
 
     session.mount("http://", custom_adapter)

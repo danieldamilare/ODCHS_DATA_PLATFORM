@@ -22,6 +22,13 @@ class Config:
     FEMALE_AVATAR_PATH = os.path.join(
         BASE_DIR, "app", "static", "asset", "female_avatar.jpeg"
     )
+    NIN_SERVER_TOKEN_URL = os.getenv("NIN_SERVER_TOKEN_URL")
+    NIN_VALIDATE_URL = os.getenv("NIN_VALIDATE_URL")
+    NIN_SERVER_URL = os.getenv("NIN_SERVER_URL")
+    NIN_ORIGIN = os.getenv("NIN_ORIGIN")
+
+
+
     HIS_SESSION_CONFIG = {
         "user_id": os.getenv("HIS_USER_ID"),
         "deployState": os.getenv("HIS_DEPLOY_STATE"),

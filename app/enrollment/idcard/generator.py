@@ -28,42 +28,50 @@ class ProgressEvent:
 
 class IdCardGenerator:
 
-    def __init__(self, concurrency: int = 4, http_timeout: float = 15.0):
+    def __init__(
+        self,
+        concurrency: int = 3,
+        http_timeout: float = 15.0,
+        template_path: str | None = None,
+        qr_code_path: str | None = None,
+        qr_code_url: str | None = None,
+    ):
         self.concurrency = concurrency
         self.http_timeout = http_timeout
+        self.template_path = template_path or TEMPLATE_PATH
+        self.qr_code_path = qr_code_path or QR_CODE_PATH
+        self.qr_code_url = qr_code_url or BHCPF_QR_CODE_URL
 
     async def fetch_qr_code_asset(self, client: httpx.AsyncClient) -> str:
         global _QR_CACHE
 
-
         async with _QR_CACHE_LOCK:
             if _QR_CACHE is not None:
                 return _QR_CACHE
-        if os.path.exists(QR_CODE_PATH):
-            return await asyncio.to_thread(self._read_local_qr)
-        try:
-            res = await client.get(BHCPF_QR_CODE_URL, timeout=self.http_timeout)
-            if res.status_code < 400:
-                encoded = base64.b64encode(res.content).decode("utf-8")
-                mimetype, _ = guess_type(BHCPF_QR_CODE_URL)
-                _QR_CACHE = f"data:{mimetype or 'image/png'};base64,{encoded}"
-                return _QR_CACHE
-        except Exception:
-            pass
+            if os.path.exists(self.qr_code_path):
+                return await asyncio.to_thread(self._read_local_qr)
+            try:
+                res = await client.get(self.qr_code_url, timeout=self.http_timeout)
+                if res.status_code < 400:
+                    encoded = base64.b64encode(res.content).decode("utf-8")
+                    mimetype, _ = guess_type(self.qr_code_url)
+                    _QR_CACHE = f"data:{mimetype or 'image/png'};base64,{encoded}"
+                    return _QR_CACHE
+            except Exception:
+                pass
         return ""
 
-    @staticmethod
-    def _read_local_qr() -> str:
-        with open(QR_CODE_PATH, "rb") as f:
+    def _read_local_qr(self) -> str:
+        with open(self.qr_code_path, "rb") as f:
             encoded = base64.b64encode(f.read()).decode("utf-8")
-            mimetype, _ = guess_type(QR_CODE_PATH)
+            mimetype, _ = guess_type(self.qr_code_path)
             return f"data:{mimetype or 'image/jpeg'};base64,{encoded}"
 
     # ---------- single card rendering ----------
 
     async def initialize_page(self, page: Page):
         await page.goto(
-            f"file://{TEMPLATE_PATH}",
+            f"file://{self.template_path}",
             wait_until="domcontentloaded",
         )
 
@@ -206,9 +214,7 @@ class IdCardGenerator:
                                     if callback:
                                         await asyncio.to_thread(
                                             callback,
-                                            ProgressEvent(
-                                                success=success, path=path
-                                            ),
+                                            ProgressEvent(success=success, path=path),
                                         )
 
                         await asyncio.gather(

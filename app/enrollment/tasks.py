@@ -329,7 +329,7 @@ def start_id_card_generate_job(batch_id: str):
 
         enrollee_number = form.enrollee_number
         payload = {"path": id_path, "enroll_no": enrollee_number}
-        task_headers.append(get_his_id_card_payload(**payload))
+        task_headers.append(get_his_id_card_payload.s(**payload))
 
     kv.hset(
         kv_batch_id_status,
