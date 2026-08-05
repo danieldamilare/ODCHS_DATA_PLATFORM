@@ -2,7 +2,6 @@ from enum import Enum
 from datetime import datetime
 import uuid as uuid_tool
 from app import db
-from app import kv
 from flask import url_for
 
 

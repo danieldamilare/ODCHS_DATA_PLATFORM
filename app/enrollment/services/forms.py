@@ -16,7 +16,6 @@ import os
 import cv2
 import base64
 from datetime import datetime
-import io
 
 
 @dataclass
@@ -73,7 +72,7 @@ class FormServices:
         try:
             file.stream.seek(0)
             file.save(path)
-        except OSError as e:
+        except OSError:
             return FormPassportUpdateResult(
                 False, "Failed to save uploaded passport. Please try again"
             )
@@ -172,7 +171,7 @@ class FormServices:
         try:
             db.session.commit()
 
-        except Exception as e:
+        except Exception:
             return FormEnrollmentResult(
                 FormEnrollmentState.HIS_ERROR, "Failed saving enrollment result."
             )
@@ -212,7 +211,7 @@ class FormServices:
                 )
             try:
                 rotate_image(form.img_path, updater.rotate_angle)
-            except Exception as e:
+            except Exception:
                 return FormUpdateResult(
                     "rotate_error", "Unable to update form due to image rotation"
                 )
@@ -220,7 +219,7 @@ class FormServices:
             db.session.add(form)
             db.session.commit()
             return FormUpdateResult("success", "Successfully update form", form)
-        except Exception as e:
+        except Exception:
             db.session.rollback()
             return FormUpdateResult("db_error", "Error updating form")
 
@@ -247,7 +246,7 @@ class FormServices:
         id_card_generator = IdCardGenerator(concurrency=1)
         try:
             _, errors = id_card_generator.create_id_card_sync([(path, result.payload)])
-        except Exception as e:
+        except Exception:
             return FormIdCardResult("failed", "ID card generation failed")
         filename = os.path.basename(path)
 

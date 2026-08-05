@@ -1,9 +1,6 @@
 import os
 import hashlib
 from werkzeug.datastructures import FileStorage
-import io
-from typing import Union
-import base64
 from pydantic import ValidationError
 from flask import current_app
 

@@ -66,7 +66,7 @@ def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
                 contents=[img, "Extract data from the image"],
                 config=config,
             )
-            print(f"Gemini call took %.3fs", perf_counter() - t0)
+            print(f"Gemini call took {perf_counter() - t0:.3f}s")
 
             release_key(current_api_key, to_cool=True, cooldown_time=SUCCESS_COOLDOWN_SECONDS)
             released = True

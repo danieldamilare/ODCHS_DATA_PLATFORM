@@ -1,2 +1,2 @@
-from .batches import *
-from .forms import *
+from .batches import *  # noqa
+from .forms import *  # noqa

@@ -8,7 +8,7 @@ from werkzeug.datastructures import FileStorage
 from app import kv
 from stat import S_IFREG
 import sqlalchemy as sa
-from typing import Optional, Literal, Dict, Tuple
+from typing import Optional, Literal, Dict
 from dataclasses import dataclass
 import uuid
 import os
@@ -185,7 +185,7 @@ class BatchServices:
             )
 
         def yield_files():
-            for uuid, firstname, othername, surname, img_path, sequence in forms:
+            for form_uuid, firstname, othername, surname, img_path, sequence in forms:
                 if not img_path or not os.path.exists(img_path):
                     continue  # should be impossible but defensive programming
                 file_name = firstname or ""
@@ -194,7 +194,7 @@ class BatchServices:
                 if surname:
                     file_name += ("_" if file_name else "") + surname
                 if not file_name:
-                    file_name = uuid
+                    file_name = form_uuid
                 file_name += f"_{sequence}"
                 file_name += os.path.splitext(img_path)[1]
                 modified_at = datetime.now()

@@ -1,11 +1,9 @@
 from dateutil import parser, relativedelta
 from datetime import datetime
-from app.config import Config
 from app.enrollment.dataloader import get_loader
 from typing import Dict, Optional
 from app.enrollment.models import Form, Batch
 from app.enrollment.schema import OCRResponse
-import base64
 import re
 
 

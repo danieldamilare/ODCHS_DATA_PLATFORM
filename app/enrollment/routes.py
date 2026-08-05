@@ -1,5 +1,4 @@
 from flask import (
-    Blueprint,
     request,
     current_app,
     jsonify,
@@ -27,9 +26,11 @@ from app.enrollment.dataloader import get_loader
 from pydantic import ValidationError
 from app.enrollment import enrollment_bp
 from app.enrollment.tasks import process_image_pipeline
+from app.core.utils import parse_opt_int
 from app import kv
 import json
 import os
+
 
 
 @enrollment_bp.route("/batches")
@@ -62,9 +63,9 @@ def batch_post():
     try:
         uploader = BatchUploader(
             batch_file=request.files["batch_file"],
-            lga_no=request.form.get("lga_no"),
-            ward_no=request.form.get("ward_no"),
-            facility_no=request.form.get("facility_no"),
+            lga_no=parse_opt_int(request.form.get("lga_no")),
+            ward_no=parse_opt_int(request.form.get("ward_no")),
+            facility_no=parse_opt_int(request.form.get("facility_no")),
         )
     except ValidationError as e:
         return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
@@ -108,6 +109,17 @@ def batch_post():
         ),
         202,
     )
+
+@enrollment_bp.get("/batches/<string:batch_id>")
+def get_batch_id(batch_id: str):
+    batch_service = BatchServices()
+    data = batch_service.get_breakdown_stat(batch_id)
+    if not data:
+        return (
+            jsonify({"success": False, "msg": "No batch exists with the given id"}),
+            404,
+        )
+    return jsonify({"success": True, "msg": "", "data": data})
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/forms/download")
@@ -345,6 +357,7 @@ def get_idcard_progress_stream(batch_id: str):
 
 @enrollment_bp.get("/batches/<string:batch_id>/idcards/download")
 def download_idcards(batch_id: str):
+    batch_service = BatchServices()
     result: BatchIdCardDownloadResult = batch_service.id_card_download(batch_id)
 
     if result.status == "invalid":
@@ -442,7 +455,7 @@ def update_form_passport(form_id: str):
         return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
 
     result = form_service.update_passport(uploader.passport, form)
-    if result.success == False:
+    if not result.success:
         return (jsonify({"success": False, "msg": result.msg}), 500)
     return jsonify({"success": True, "msg": result.msg}), 200
 

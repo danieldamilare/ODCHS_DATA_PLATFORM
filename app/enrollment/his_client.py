@@ -1,5 +1,5 @@
 from app.enrollment.session import get_his_session
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, Optional, Any
 from dataclasses import dataclass
 import requests
 from tenacity import (
@@ -66,7 +66,7 @@ class HISClient:
                 res = self.session.post(url, json=json_data)
             else:
                 res = self.session.post(url, data=raw_data)
-        except requests.RequestException as e:
+        except requests.RequestException:
             raise IOError("Error communication to his site")
 
         if not res.ok:
@@ -89,7 +89,7 @@ class HISClient:
 
         try:
             res = self.session.get(url, params=param)
-        except requests.RequestException as e:
+        except requests.RequestException:
             raise IOError("Error communication to his site")
 
         if not res.ok:

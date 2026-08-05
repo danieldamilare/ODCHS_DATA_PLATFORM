@@ -25,7 +25,6 @@ from app.enrollment.llm.clients import (
     gemini_client,
     ServerConnectionError,
 )
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from celery import group, chord
 from time import perf_counter
 import cv2
@@ -193,7 +192,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
         if is_batch:
             _finalize_image_processing(batch_name, batch_id, form)
 
-    except AllKeysExhausted as e:
+    except AllKeysExhausted:
         traceback.print_exc()
         countdown = min(45 * (self.request.retries + 1), 5 * 60)
         raise self.retry(countdown=countdown)
@@ -219,7 +218,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
 
 @celery_app.task
 def reclaim_leased_api_keys():
-    from app.enrollment.llm.keys import KEY_POOL, LEASE, LEASE_TRACKER, TOTAL
+    from app.enrollment.llm.keys import KEY_POOL, LEASE, LEASE_TRACKER
     from hashlib import md5
 
     keys = kv.lrange(LEASE, 0, -1)
@@ -239,7 +238,7 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
         client = HISClient()
         result = client.fetch_id_details_from_his(enroll_no)
         outcome = result.success
-    except Exception as e:
+    except Exception:
         result = None
         outcome = False
 

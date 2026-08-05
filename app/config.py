@@ -26,6 +26,7 @@ class Config:
     NIN_VALIDATE_URL = os.getenv("NIN_VALIDATE_URL")
     NIN_SERVER_URL = os.getenv("NIN_SERVER_URL")
     NIN_ORIGIN = os.getenv("NIN_ORIGIN")
+    SCRATCH_FILE_PATH = os.path.join(BASE_DIR, "temp")
 
 
 

@@ -5,7 +5,7 @@ from celery import Celery, Task
 from redis import Redis
 
 db = SQLAlchemy()
-kv = None
+kv: Redis = Redis()
 celery_app = Celery(__name__)
 
 
@@ -22,7 +22,7 @@ def create_app(config=Config):
                 return self.run(*args, **kwargs)
 
     celery_app.config_from_object(config)
-    celery_app.Task = FlaskTask
+    celery_app.Task = FlaskTask # type: ignore[misc]
     celery_app.autodiscover_tasks(["app.enrollment"])
     from app.enrollment import enrollment_bp
 

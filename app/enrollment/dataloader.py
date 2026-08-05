@@ -100,7 +100,7 @@ class DataLoader:
 
         self.wards = {}
         self.reverse_ward = {}
-        count = min(20, len(self.lgas))  # 20 workers since they are i/o
+        count = min(20, len(self.lgas or {}))  # 20 workers since they are i/o
         with ThreadPoolExecutor(max_workers=count) as executor:
             results = {
                 executor.submit(self._load_wards, lga_name, lga_code): lga_code

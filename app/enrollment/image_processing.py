@@ -126,7 +126,7 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
             continue
     if logger:
         logger.info(
-            f"Error extracting passport: returning a negative coordinatine for error"
+            "Error extracting passport: returning a negative coordinatine for error"
         )
     return original_image, {
         "x1": -1,
