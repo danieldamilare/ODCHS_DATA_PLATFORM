@@ -47,6 +47,7 @@ class Config:
     broker_url = REDIS_URL
     task_acks_late = True
     worker_reject_on_worker_lost = True
+    worker_prefetch_multiplier = 1
 
     broker_transport_options = {"visibility_timeout": 18000}
     broker_connection_retry_on_startup = True

@@ -287,8 +287,8 @@ def generate_id_card(result, batch_id):
 
     generator = IdCardGenerator()
     generator.create_id_card_sync(to_generate, publish_update_idcard_status)
-    kv.hset(kv_batch_id_status, "status", "completed")
-    payload = {"type": "finished"}
+    kv.hset(kv_batch_id_status, "status", "done")
+    payload = {"type": "status", "status": "done"}
     kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
     kv.expire(kv_batch_id_name, 86400)
     kv.expire(kv_batch_id_status, 86400)

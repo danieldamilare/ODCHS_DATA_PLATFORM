@@ -116,7 +116,7 @@ class BatchServices:
         extract_zip_for_processing.delay(path, batch_id)
         return BatchJobResult(status="created", batch=batch)
 
-    def get_breakdown_stat(self, batch_id) -> Dict:
+    def get_breakdown_stat(self, batch_id: str) -> Dict:
         batch: Optional[Batch] = db.session.scalar(
             sa.select(Batch).where(Batch.uuid == batch_id)
         )
@@ -124,26 +124,25 @@ class BatchServices:
         if not batch:
             return {}
 
+        summary = {
+            (status.value if hasattr(status, "value") else str(status).lower()): 0
+            for status in FormStatus
+        }
+
         summary_stmt = (
             sa.select(Form.status, sa.func.count(Form.id))
             .where(Form.batch_id == batch.id)
             .group_by(Form.status)
         )
 
-        current_resp = batch.to_dict()
-        current_resp["summary"] = {
-            "ready": 0,
-            "enrolled": 0,
-            "failed": 0,
-            "need_rescan": 0,
-            "error": 0,
-            "rejected": 0,
-        }
+        results = db.session.execute(summary_stmt).all()
 
-        result = db.session.execute(summary_stmt).all()
-        for status, count in result:
-            status_name = status.value if hasattr(status, "value") else str(status)
-            current_resp["summary"][status_name] = count
+        for status, count in results:
+            key = status.value if hasattr(status, "value") else str(status).lower()
+            summary[key] = count
+
+        current_resp = batch.to_dict()
+        current_resp["summary"] = summary
         return current_resp
 
     def get(self, batch_id) -> Optional[Batch]:
@@ -242,7 +241,7 @@ class BatchServices:
         kv_batch_id_status = f"batch_idcard_status:{batch_id}"
         if (
             kv.exists(kv_batch_id_name) != 1
-            or (kv.hget(kv_batch_id_status, "status") or "").lower() != "completed"
+            or (kv.hget(kv_batch_id_status, "status") or "").lower() != "done"
         ):
             return BatchIdCardDownloadResult(
                 "no_job",

@@ -145,6 +145,10 @@ class FormServices:
             return FormEnrollmentResult(
                 FormEnrollmentState.NOT_EXISTS, "No form with the given id"
             )
+        if form.status == FormStatus.ENROLLED:
+            return FormEnrollmentResult(
+                FormEnrollmentState.HIS_DUPLICATE, "You have already enrolled this form before"
+            )
 
         try:
             b64_passport = self._get_passport_base64(form)
@@ -191,6 +195,8 @@ class FormServices:
         form = db.session.scalar(sa.select(Form).where(Form.uuid == form_id))
         if not form:
             return FormUpdateResult("invalid", "No form with the given id")
+        if form.status == FormStatus.ENROLLED:
+            return FormUpdateResult("invalid", "You cannot update a form that has been enrolled")
 
         for key, value in updater.get_updates().items():
             if key in form.UPDATABLE_FIELDS:

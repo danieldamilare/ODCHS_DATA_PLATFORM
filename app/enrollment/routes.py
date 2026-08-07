@@ -62,7 +62,7 @@ def batch_get():
 def batch_post():
     try:
         uploader = BatchUploader(
-            batch_file=request.files["batch_file"],
+            batch_file= request.files["batch_file"],
             lga_no=parse_opt_int(request.form.get("lga_no")),
             ward_no=parse_opt_int(request.form.get("ward_no")),
             facility_no=parse_opt_int(request.form.get("facility_no")),
@@ -234,6 +234,7 @@ def get_batch_progress_stream(batch_id: str):
                 print(f"got message: {message}")
                 if message is None:
                     yield ": heartbeat\n\n"
+                    continue
 
                 elif message["type"] != "message":
                     continue
@@ -304,7 +305,7 @@ def get_idcard_progress_stream(batch_id: str):
         kv_status_key = f"batch_idcard_status:{batch_id}"
         current_status = (kv.hget(kv_status_key, "status") or "").lower()
 
-        if current_status == "completed":
+        if current_status == "done":
             snapshot = kv.hgetall(kv_status_key)
             yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
             return
@@ -505,7 +506,7 @@ def rescan_form(form_id: str):
     if not new_image:
         return jsonify({"success": False, "msg": "No replacement image provided"}), 400
 
-    new_image.save(form.img_path)  # overwrite in place, same path
+    new_image.save(form.img_path)  
     form.status = FormStatus.PENDING
     form.error_message = None
     form.reason = None

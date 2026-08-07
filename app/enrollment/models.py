@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid as uuid_tool
 from app import db
 from flask import url_for
+from app.enrollment.dataloader import get_loader
 
 
 class BatchStatus(Enum):
@@ -38,6 +39,7 @@ class Batch(db.Model):
     forms = db.relationship("Form", backref="batch", lazy=True)
 
     def to_dict(self):
+        loader = get_loader()
         return {
             "id": self.uuid,
             "total": self.total,
@@ -47,6 +49,9 @@ class Batch(db.Model):
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
+            "lga": (loader.reverse_lga or {})[str(self.lga_no)], 
+            "ward": (loader.reverse_ward or {})[str(self.ward_no)],
+            "facility":(loader.reverse_facility or {})[str(self.facility_no)],
             "submitted_at": (
                 self.submitted_at.isoformat() if self.submitted_at else None
             ),
@@ -147,6 +152,7 @@ class Form(db.Model):
     )
 
     def to_dict(self):
+        loader = get_loader()
         img_path = url_for(
             "enrollment.get_form_asset",
             asset_id=self.uuid,
@@ -180,11 +186,16 @@ class Form(db.Model):
             "category": self.category,
             "marital_status": self.marital_status,
             "settlement": self.settlement,
+            "lga": (loader.reverse_lga or {})[str(self.lga_no)], 
+            "ward": (loader.reverse_ward or {})[str(self.ward_no)],
+            "facility":(loader.reverse_facility or {})[str(self.facility_no)],
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
             "genotype": self.genotype,
             "medical_history": self.medical_history,
+            "flagged": self.flagged,
+            "reason": self.reason,
             "occupation": self.occupation,
             "next_of_kin": {
                 "firstname": self.kin_firstname,
