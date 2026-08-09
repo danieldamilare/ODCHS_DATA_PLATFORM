@@ -7,7 +7,7 @@ import io
 import csv
 
 def get_dataset_type(file: FileStorage) -> Optional[str]:
-    file_name = file.name
+    file_name = file.filename
     if not file_name:
         return None
     ext = os.path.splitext(file_name)[1].lower()
@@ -28,7 +28,7 @@ def read_dataset_header(file: FileStorage) -> List[Any]:
     if ext == 'csv':
         reader = _get_csv_reader(file)
         try:
-            return next(reader)[1]
+            return next(reader)
         except StopIteration:
             return []
 

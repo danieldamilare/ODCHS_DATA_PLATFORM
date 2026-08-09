@@ -44,24 +44,21 @@ class NINValidator(BaseModel):
 class NINBatchValidator(BaseModel):
     batch_file: FileStorage
     generate_report: bool = False
-    aggregrate_by_lga: bool = False
+    aggregrate_by_lga_ward: bool = False
+    aggregrate_by_lga_facility: bool =False
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @field_validator('batch_file')
-    @classmethod
-    def validate_batch_file(cls, batch_file: FileStorage):
-            file_name = str(batch_file.name)
-            ext = os.path.splitext(file_name)[1]
-            if ext not in ('xls', 'xlsx', 'csv'):
-                raise ValueError("Invalid File")
-            return file_name
 
     @model_validator(mode='after')
     def validate_model(self):
         self.batch_file.stream.seek(0)
-        file_name = self.batch_file.file_name
-        if not file_name or os.path.splitext(file_name)[1].lower() not in ("csv", "xlsx", "xls"):
-            raise ValueError("Invalid File Type")
+        file_name = self.batch_file.filename
+
+        if not file_name or os.path.splitext(file_name)[1].lower() not in (".csv", ".xlsx", ".xls"):
+            raise ValueError("Invalid File Type. Please upload an excel or csv file")
+
+        if self.aggregrate_by_lga_facility and self.aggregrate_by_lga_ward:
+            raise ValueError("You cannot breakdown by facility and ward at the same time. Please select one")
+       
         try:
             header_value = read_dataset_header(self.batch_file)
         except Exception:
@@ -75,7 +72,7 @@ class NINBatchValidator(BaseModel):
         missing = compulsory_set - header_set
         if missing:
             raise ValueError(f"Columns: {missing} are needed for nin validation submisson")
-        if (self.generate_report or self.aggregrate_by_lga) and (missing := option_set - header_set):
+        if (self.generate_report or self.aggregrate_by_lga_ward or self.aggregrate_by_lga_facility) and (missing := option_set - header_set):
             raise ValueError(f"Columns {missing} is missing, and needed for validation and report generation")
         self.batch_file.stream.seek(0)
         return self
