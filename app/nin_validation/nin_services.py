@@ -1,6 +1,7 @@
 from app.nin_validation.nin_client import load_nin_client
 from app.nin_validation.schema import NINBatchValidator
 from app.nin_validation.utils import get_dataset_type
+from app.nin_validation.tasks import process_nin_batch_validation
 from datetime import date
 from app import kv
 import threading
@@ -12,7 +13,8 @@ from typing import Literal, Optional
 import hashlib
 import pandas as pd
 from dataclasses import dataclass
-# from app.nin_validation.tasks import process_nin_validation
+import base64
+
 
 
 @dataclass
@@ -21,9 +23,11 @@ class NINBatchResult:
     msg: str
     job_id: Optional[str] = None
 
+
 class NINServices:
     def __init__(self):
         self.client = load_nin_client()
+
     def validate_nin(self, dob: date, nin: str):
         return self.client.validate_nin(dob, nin)
 
@@ -36,17 +40,19 @@ class NINServices:
         checksum = hashlib.md5(file.read()).hexdigest()
         file.stream.seek(0)
 
-        if kv.exists(checksum): # ooops you are only allowed one trial a day
-            job_id = kv.get(checksum) 
-            return NINBatchResult("duplicate", "You already submitted this document", job_id)
+        if kv.exists(checksum):  # ooops you are only allowed one trial a day
+            job_id = kv.get(checksum)
+            return NINBatchResult(
+                "duplicate", "You already submitted this document", job_id
+            )
 
         data_type = get_dataset_type(file)
-        dir_path = current_app.config['SCRATCH_FILE_PATH']
+        dir_path = current_app.config["SCRATCH_FILE_PATH"]
         file_name = secure_filename(file.file_name)
         try:
 
-            if data_type != 'csv':
-                df= pd.read_excel(file.stream)
+            if data_type != "csv":
+                df = pd.read_excel(file.stream)
                 name = os.path.splitext(file_name)[0]
                 new_path = os.path.join(dir_path, name) + ".csv"
                 df.to_csv(new_path)
@@ -55,12 +61,45 @@ class NINServices:
                 file.save(new_path)
         except OSError:
             return NINBatchResult("save_error", "Error occured while saving your file")
-        job_id = str(uuid.uuid4())
-        kv.set(checksum, job_id)
-        kv.hset(job_id, mapping={"checksum": checksum,
-                                   "path": new_path,
-                                   "status": "Loading",
+        gen_id = str(uuid.uuid4())
+        job_id = "nin:batch:" + gen_id
 
-                                   })
-        # process_nin_batch_validation.delay(job_id)
-        return NINBatchResult("success", "NIN Batch Validation Job has successfully started")
+        kv.set(checksum, job_id)
+        aggregate = None
+        if res.aggregrate_by_lga_facility:
+            aggregate = "facility"
+        elif res.aggregrate_by_lga_ward:
+            aggregate = "ward"
+        kv.hset(
+            job_id,
+            mapping={
+                "checksum": checksum,
+                "path": new_path,
+                "status": "loading",
+                "completed": 0,
+                "aggregate": aggregate,
+                "generate_report": res.generate_report
+            },
+        )
+
+        process_nin_batch_validation.delay(job_id)
+        return NINBatchResult(
+            "success", "NIN Batch Validation Job has successfully started", 
+            gen_id
+        )
+
+    def get_batch_status(self, job_id: str, with_stream=False):
+        real_id = "nin:batch:" + job_id
+        payload = kv.hgetall(real_id)
+        if not payload:
+            return None
+
+        new_payload = {}
+        new_payload["status"] = payload.get('status')
+        new_payload["completed"] = payload.get("completed")
+        new_payload["total"] = payload.get("total")
+        new_payload["aggregrate"] = payload.get("aggregrate")
+        new_payload["generate_report"] = payload.get("generate_report")
+        if payload["status"] != "done" and with_stream:
+            new_payload["channel"] = f"channel:real_id"
+        return new_payload
