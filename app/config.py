@@ -48,16 +48,22 @@ class Config:
     task_acks_late = True
     worker_reject_on_worker_lost = True
     worker_prefetch_multiplier = 1
+    result_backend = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+    result_expires = 86400
+    task_default_queue = "io_bound"
+    task_default_exchange = "io_bound"
+    task_default_routing_key = "io_bound"
+
 
     broker_transport_options = {"visibility_timeout": 18000}
     broker_connection_retry_on_startup = True
 
     task_publish_retry = True
     task_publish_retry_policy = {
-        "max_retries": 5,  # Try up to 5 times if Redis socket is flaky
-        "interval_start": 0.2,  # Start with a 200ms delay
-        "interval_step": 0.5,  # Progressively wait longer between attempts
-        "interval_max": 2.0,  # Cap retry intervals at 2 seconds max
+        "max_retries": 5,
+        "interval_start": 0.2,
+        "interval_step": 0.5, 
+        "interval_max": 2.0,  
     }
 
     beat_schedule = {

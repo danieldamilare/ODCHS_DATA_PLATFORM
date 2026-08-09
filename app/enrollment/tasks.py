@@ -175,7 +175,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
     db.session.commit()
 
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, max_retries=None)
 def process_image_pipeline(self, form_id: str, is_batch=True):
     form: Optional[Form] = db.session.scalar(
         sa.select(Form).where(Form.uuid == form_id)
@@ -243,9 +243,10 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
         outcome = False
 
     fetched = int(kv.hincrby(kv_status_key, "fetched", 1))
+    total = int(kv.hget(kv_status_key, "total") or 0)
     kv.publish(
         f"channel:batch_idcard:{batch_id}",
-        json.dumps({"type": "fetch_progress", "fetched": fetched, "enrollee_no": enroll_no, "success": outcome}),
+        json.dumps({"type": "fetch_progress", "fetched": fetched, "total": total, "enrollee_no": enroll_no, "success": outcome})
     )
     return (path, result) if result else None
 
@@ -269,8 +270,10 @@ def generate_id_card(result, batch_id):
 
     def publish_update_idcard_status(event: ProgressEvent):
         completed = int(kv.hincrby(kv_batch_id_status, "completed", 1))
-        success = int(kv.hget(kv_batch_id_status, "success") or 0)
-        failed = int(kv.hget(kv_batch_id_status, "failed") or 0)
+        all_data = kv.hgetall(kv_batch_id_status)
+        success = int(all_data.get('success', 0))
+        failed = int(all_data.get('failed', 0))
+        total = int(all_data.get('total', 0))
         if event.success:
             success = int(kv.hincrby(kv_batch_id_status, "success", 1))
             kv.sadd(kv_batch_id_name, event.path)
@@ -278,8 +281,10 @@ def generate_id_card(result, batch_id):
             failed = int(kv.hincrby(kv_batch_id_status, "failed", 1))
 
         payload = {
-            "type": "status",
+            "type": "generate_progress",
             "completed": completed,
+            "total": total,
+            "status": all_data.get("status", ""), 
             "failed": failed,
             "success": success,
         }
@@ -334,7 +339,7 @@ def start_id_card_generate_job(batch_id: str):
         kv_batch_id_status,
         mapping={
             "total": len(forms),
-            "status": "fetching" if task_headers else "completed",
+            "status": "fetching" if task_headers else "done",
             "success": already_succeed,
             "completed": already_succeed,
             "failed": 0,
@@ -346,5 +351,5 @@ def start_id_card_generate_job(batch_id: str):
         callback = generate_id_card.s(batch_id)
         chord(task_headers)(callback)
     else:
-        payload = {"type": "finished"}
+        payload = {"type": "status", "status": "done"}
         kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))

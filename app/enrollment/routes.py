@@ -179,23 +179,18 @@ def get_batch_forms(batch_id: str):
 @enrollment_bp.get("/batches/<string:batch_id>/progress")
 def get_batch_progress_stream(batch_id: str):
     batch_service = BatchServices()
+    batch = batch_service.get(batch_id)
+    if batch is None:
+        return jsonify({"success": False, "msg": "No batch with the given id"}), 404
 
     @stream_with_context
     def generate():
-        batch = batch_service.get(batch_id)
-
-        if batch is None:
-            yield (
-                "event: error\n"
-                f"data: {json.dumps({'message': 'Batch not found'})}\n\n"
-            )
-            return
-
+        nonlocal batch
         if batch.status == BatchStatus.DONE:
             yield ("event: complete\n" f"data: {json.dumps(batch.to_dict())}\n\n")
             return
 
-        subscriber = kv.pubsub()
+        subscriber = kv.pubsub(ignore_subscribe_messages=True)
 
         try:
             subscriber.subscribe(f"channel:{batch_id}")
@@ -221,11 +216,11 @@ def get_batch_progress_stream(batch_id: str):
                     f"data: {json.dumps({'id': form_uuid, 'status': status.value})}\n\n"
                 )
 
-            db.session.close()
+            db.session.remove()
 
             progress = kv.hgetall(f"batch:{batch_id}")
             if progress.get("status") == "done":
-                db.session.expire(batch)
+                batch = db.session.execute(sa.select(Batch).where(Batch.id == batch.id)).scalar()
                 yield ("event: complete\n" f"data: {json.dumps(batch.to_dict())}\n\n")
                 return
 
@@ -252,7 +247,7 @@ def get_batch_progress_stream(batch_id: str):
                     yield ("event: status\n" f"data: {json.dumps(payload)}\n\n")
 
                 if payload.get("status") == "done":
-                    db.session.expire(batch)
+                    batch = db.session.execute(sa.select(Batch).where(Batch.id == batch.id)).scalar()
                     yield (
                         "event: complete\n" f"data: {json.dumps(batch.to_dict())}\n\n"
                     )
@@ -263,6 +258,7 @@ def get_batch_progress_stream(batch_id: str):
         finally:
             subscriber.unsubscribe(f"channel:{batch_id}")
             subscriber.close()
+            db.session.remove()
 
     return Response(
         generate(),
@@ -294,14 +290,16 @@ def start_id_card_generation(batch_id: str):
 @enrollment_bp.get("/batches/<string:batch_id>/idcards/progress")
 def get_idcard_progress_stream(batch_id: str):
     batch_service = BatchServices()
+    batch = batch_service.get(batch_id)
+    if batch is None:
+        return jsonify({"success": False, "msg": "No batch exists with the given id"}), 4040
+    batch_status_id = f"batch_idcard_status:{batch_id}"
+    current_batch_status = (kv.hget(batch_status_id, "status") or "").lower()
+    if not current_batch_status:
+        return jsonify({"success": False, "msg": "No Id card generation for this batch has started"}), 404
 
     @stream_with_context
     def generate():
-        batch = batch_service.get(batch_id)
-        if batch is None:
-            yield f"event: error\ndata: {json.dumps({'message': 'Batch not found'})}\n\n"
-            return
-
         kv_status_key = f"batch_idcard_status:{batch_id}"
         current_status = (kv.hget(kv_status_key, "status") or "").lower()
 
@@ -310,11 +308,10 @@ def get_idcard_progress_stream(batch_id: str):
             yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
             return
 
-        if not current_status:
-            yield f"event: error\ndata: {json.dumps({'message': 'No generation job has started for this batch'})}\n\n"
-            return
+        payload = {"type": "started"}
+        yield f"event: started\ndata:{json.dumps(payload)}\n\n"
 
-        subscriber = kv.pubsub()
+        subscriber = kv.pubsub(ignore_subscribe_messages=True)
         try:
             subscriber.subscribe(f"channel:batch_idcard:{batch_id}")
 
@@ -322,23 +319,29 @@ def get_idcard_progress_stream(batch_id: str):
             yield f"event: status\ndata: {json.dumps(snapshot)}\n\n"
 
             while True:
-                message = subscriber.get_message(ignore_subscribe_messages=True, timeout=15)
+                message = subscriber.get_message(timeout=15)
                 if message is None:
                     yield ": heartbeat\n\n"
                     continue
 
                 if message is not None and message["type"] == "message":
                     payload = json.loads(message["data"])
-                    if payload.get("type") == "finished":
+                    if payload.get("type") == "status" and payload.get("status") == "done":
                         snapshot = kv.hgetall(kv_status_key)
                         yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
                         break
+                    if payload.get("type") == "fetch_progress":
+                        yield f"event: fetch_progress\ndata: {json.dumps(payload)}\n\n"
+                        continue
+                    if payload.get("type") == "generate_progress":
+                        yield f"event: generate_progress\ndata: {json.dumps(payload)}\n\n"
+                        continue
                     yield f"event: status\ndata: {json.dumps(payload)}\n\n"
                     continue
 
                 snapshot = kv.hgetall(kv_status_key)
                 yield f"event: status\ndata: {json.dumps(snapshot)}\n\n"
-                if (snapshot.get("status") or "").lower() == "completed":
+                if (snapshot.get("status") or "").lower() == "done":
                     yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
                     break
         except Exception:
@@ -546,13 +549,9 @@ def enroll_form(form_id: str):
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 422
     if result.status == FormEnrollmentState.HIS_ERROR:
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 502
-    status = (
-        "duplicate"
-        if result.status == FormEnrollmentState.HIS_DUPLICATE
-        else "enrolled"
-    )
-
-    return jsonify({"success": True, "status": status, "msg": result.msg}), 200
+    if result.status == FormEnrollmentState.HIS_DUPLICATE:
+        return jsonify({"success": False, "status": "duplicate", "msg": result.msg}), 409
+    return jsonify({"success": True, "status": "success", "msg": result.msg}), 200
 
 
 @enrollment_bp.post("/form/<string:form_id>/reprocess")

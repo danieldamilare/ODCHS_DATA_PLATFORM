@@ -1,9 +1,11 @@
 from enum import Enum
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
 from werkzeug.datastructures import FileStorage
 from app.enrollment.utils import validate_zip_file
 from app.enrollment.utils import is_image_extension
+from app.nin_validation.nin_client import load_nin_client
+from datetime import datetime
 
 
 class MaritalStatusEnum(str, Enum):
@@ -85,6 +87,7 @@ class FormUpdater(BaseModel):
     gender: Literal["Male", "Female"]
     phone_number: str
     nin: str
+    nin_verified: Optional[bool] = False
     address: str
     category: int
     marital_status: str
@@ -133,6 +136,16 @@ class FormUpdater(BaseModel):
         if rotate_angle not in (90, 180, 270):
             raise ValueError("Invalid rotation angle")
         return rotate_angle
+
+    @model_validator(mode="after")
+    def validate_model(self):
+        client = load_nin_client()
+        if self.nin_verified:
+            dob = datetime.strptime(self.dob, "%m/%d/%Y").date()
+            result = client.validate_nin(dob, self.nin)
+            if not result.success:
+                raise ValueError("NIN is not valid")
+        return self
 
     def get_updates(self) -> dict:
         return {k: v for k, v in self.model_dump().items() if v is not None}

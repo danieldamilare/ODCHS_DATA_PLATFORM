@@ -10,12 +10,12 @@ import re
 def normalize_ng_phone(raw: str) -> Optional[str]:
     if not raw:
         return None
-    digits = re.sub(r"\D", "", raw)  # strip spaces, dashes, parens, +
+    digits = re.sub(r"\D", "", raw)
     if digits.startswith("234") and len(digits) == 13:
         return f"+{digits}"
     if digits.startswith("0") and len(digits) == 11:
         return f"+234{digits[1:]}"
-    return None  # unrecognized format
+    return None
 
 
 def compute_age(dob) -> int:
@@ -124,8 +124,10 @@ def normalize_form_object(
 
     if not form.nin:
         flagged_reasons.append("No nin provided")
+        form.nin_valid = False
     elif len(form.nin) != 11:
         flagged_reasons.append("Nin is not 11 digits")
+        form.nin_valid = False
 
     phone_number = form.phone_number
     kin_phone_number = form.kin_phone_number

@@ -49,9 +49,9 @@ class Batch(db.Model):
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
-            "lga": (loader.reverse_lga or {})[str(self.lga_no)], 
-            "ward": (loader.reverse_ward or {})[str(self.ward_no)],
-            "facility":(loader.reverse_facility or {})[str(self.facility_no)],
+            "lga": (loader.reverse_lga or {}).get(str(self.lga_no)),
+            "ward": (loader.reverse_ward or {}).get(str(self.ward_no)),
+            "facility": (loader.reverse_facility or {}).get(str(self.facility_no)),
             "submitted_at": (
                 self.submitted_at.isoformat() if self.submitted_at else None
             ),
@@ -140,6 +140,8 @@ class Form(db.Model):
     flagged = db.Column(db.Boolean, default=False, nullable=True)
     reason = db.Column(db.String, nullable=True)
     title = db.Column(db.String, nullable=True)
+    nin_verified = db.Column(db.Boolean, default=False, nullable=True)
+    nin_valid = db.Column(db.Boolean, nullable=True)
     error_message = db.Column(db.String, nullable=True)
     enrolled_at = db.Column(db.DateTime, default=None, nullable=True)
 
@@ -186,17 +188,18 @@ class Form(db.Model):
             "category": self.category,
             "marital_status": self.marital_status,
             "settlement": self.settlement,
-            "lga": (loader.reverse_lga or {})[str(self.lga_no)], 
-            "ward": (loader.reverse_ward or {})[str(self.ward_no)],
-            "facility":(loader.reverse_facility or {})[str(self.facility_no)],
+            "lga": (loader.reverse_lga or {}).get(str(self.lga_no), None),
+            "ward": (loader.reverse_ward or {}).get(str(self.ward_no), None),
+            "facility":(loader.reverse_facility or {}).get(str(self.facility_no), None),
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
             "genotype": self.genotype,
             "medical_history": self.medical_history,
             "flagged": self.flagged,
-            "reason": self.reason,
             "occupation": self.occupation,
+            "nin_verified": self.nin_verified,
+            "nin_valid": self.nin_valid,
             "next_of_kin": {
                 "firstname": self.kin_firstname,
                 "surname": self.kin_surname,
