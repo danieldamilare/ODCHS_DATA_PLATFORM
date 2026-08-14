@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getBatchDetail, getBatchForms } from "../api/enrollment";
+import { getBatchDetail, getBatchForms, downloadBatchForms } from "../api/enrollment";
 import useBatchProgress from "../hooks/useBatchProgress";
 import StatusBadge from "../components/ui/StatusBadge";
-import { ArrowLeft, ChevronRight, Play, Loader2, Zap } from "lucide-react";
+import FormActions from "../components/enrollment/FormActions";
+import { useToast } from "../components/ui/Toast";
+import { ArrowLeft, ChevronRight, Play, Loader2, Zap, Download, CreditCard } from "lucide-react";
 
 const STATUS_LABELS = {
     extracting: "EXTRACTING ZIP...",
@@ -14,12 +16,14 @@ const STATUS_LABELS = {
 export default function BatchDetails() {
     const { batchId } = useParams();
     const navigate = useNavigate();
+    const toast = useToast();
     const [batch, setBatch] = useState(null);
     const [forms, setForms] = useState([]);
     const [filter, setFilter] = useState("all");
     const [loading, setLoading] = useState(true);
     const [loadingForms, setLoadingForms] = useState(false);
     const [hasMore, setHasMore] = useState(false);
+    const [downloadingForms, setDownloadingForms] = useState(false);
     const queueRef = useRef(null);
 
     const { progress, events, done: sseDone } = useBatchProgress(batchId);
@@ -76,6 +80,19 @@ export default function BatchDetails() {
     const statusText = progress.status || batch?.status?.toLowerCase() || "—";
     const summary = batch?.summary || {};
     const readyCount = summary.ready || 0;
+    const enrolledCount = summary.enrolled || 0;
+
+    async function handleDownloadForms() {
+        setDownloadingForms(true);
+        try {
+            const statusParam = filter === "all" ? undefined : filter;
+            await downloadBatchForms(batchId, statusParam);
+        } catch (err) {
+            toast.error(err?.msg || "Could not download forms");
+        } finally {
+            setDownloadingForms(false);
+        }
+    }
 
     if (loading) {
         return (
@@ -99,18 +116,29 @@ export default function BatchDetails() {
                     </button>
                     <div>
                         <h1 className="text-xl font-bold text-slate-900">Batch {batch.id?.slice(0, 8)}</h1>
-                        <p className="text-sm text-slate-500">{total} forms</p>
+                        <p className="text-sm text-slate-500">{total} forms · {batch.lga || "—"} / {batch.ward || "—"}</p>
                     </div>
                 </div>
-                {isDone && readyCount > 0 && (
-                    <button
-                        onClick={() => navigate(`/enrollment/batches/${batchId}/review`)}
-                        className="flex items-center gap-2 gradient-primary rounded-xl text-white px-6 py-2.5 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all"
-                    >
-                        <Play size={16} />
-                        Start Review ({readyCount})
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {isDone && enrolledCount > 0 && (
+                        <button
+                            onClick={() => navigate(`/enrollment/batches/${batchId}/idcards`)}
+                            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-primary-300 hover:text-primary-700 hover:bg-primary-50/40 transition-all"
+                        >
+                            <CreditCard size={16} />
+                            ID Cards →
+                        </button>
+                    )}
+                    {isDone && readyCount > 0 && (
+                        <button
+                            onClick={() => navigate(`/enrollment/batches/${batchId}/review`)}
+                            className="flex items-center gap-2 gradient-primary rounded-xl text-white px-6 py-2.5 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all"
+                        >
+                            <Play size={16} />
+                            Start Review ({readyCount})
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* LIVE STREAM VIEW */}
@@ -178,16 +206,28 @@ export default function BatchDetails() {
             {/* DONE VIEW */}
             {isDone && (
                 <>
-                    <div className="flex flex-wrap gap-2">
-                        <FilterChip label={`All · ${total}`} active={filter === "all"} onClick={() => setFilter("all")} />
-                        {Object.entries(summary).map(([status, count]) => (
-                            <FilterChip
-                                key={status}
-                                label={`${status.replace("_", " ")} · ${count}`}
-                                active={filter === status}
-                                onClick={() => setFilter(filter === status ? "all" : status)}
-                            />
-                        ))}
+                    <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap gap-2">
+                            <FilterChip label={`All · ${total}`} active={filter === "all"} onClick={() => setFilter("all")} />
+                            {Object.entries(summary)
+                                .filter(([, count]) => count > 0)
+                                .map(([status, count]) => (
+                                    <FilterChip
+                                        key={status}
+                                        label={`${status.replace("_", " ")} · ${count}`}
+                                        active={filter === status}
+                                        onClick={() => setFilter(filter === status ? "all" : status)}
+                                    />
+                                ))}
+                        </div>
+                        <button
+                            onClick={handleDownloadForms}
+                            disabled={downloadingForms}
+                            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-primary-300 hover:text-primary-700 hover:bg-primary-50/40 transition-all disabled:opacity-50"
+                        >
+                            {downloadingForms ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                            Download {filter === "all" ? "All" : filter.replace("_", " ")}
+                        </button>
                     </div>
 
                     <div className="card overflow-hidden">
@@ -209,6 +249,7 @@ export default function BatchDetails() {
                                             <th className="px-6 py-3 font-semibold">#</th>
                                             <th className="px-6 py-3 font-semibold">Name</th>
                                             <th className="px-6 py-3 font-semibold">Status</th>
+                                            <th className="px-6 py-3 font-semibold">Actions</th>
                                             <th className="px-6 py-3 font-semibold w-10"></th>
                                         </tr>
                                     </thead>
@@ -227,6 +268,9 @@ export default function BatchDetails() {
                                                     }
                                                 </td>
                                                 <td className="px-6 py-3.5"><StatusBadge status={form.status} /></td>
+                                                <td className="px-6 py-3.5" onClick={(e) => e.stopPropagation()}>
+                                                    <FormActions form={form} variant="row" onChanged={() => fetchForms()} />
+                                                </td>
                                                 <td className="px-6 py-3.5 text-slate-300 group-hover:text-primary-400 transition-colors"><ChevronRight size={16} /></td>
                                             </tr>
                                         ))}

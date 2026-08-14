@@ -4,7 +4,13 @@ import { getForm, updateForm, uploadPassport, rejectForm, enrollForm, getLGAs, g
 import { useToast } from "../components/ui/Toast";
 import CropModal from "../components/enrollment/CropModal";
 import ImageViewer from "../components/enrollment/ImageViewer";
-import { ArrowLeft, Upload, Crop, User, Loader2, CheckCircle, AlertTriangle, XCircle, Info, Timer, Trophy, X, BarChart3 } from "lucide-react";
+import StatusBanner from "../components/enrollment/StatusBanner";
+import FlagCallout from "../components/enrollment/FlagCallout";
+import FormActions from "../components/enrollment/FormActions";
+import { canEdit } from "../constants/formStatus";
+import useNinVerification from "../hooks/useNinVerification";
+import { warmNin } from "../api/nin";
+import { ArrowLeft, Upload, Crop, User, Loader2, CheckCircle, AlertTriangle, XCircle, Timer, Trophy, X, BarChart3, RefreshCw, ShieldCheck, ShieldAlert } from "lucide-react";
 
 /* ── Required fields (mirrors backend FormUpdater) ── */
 const REQUIRED = new Set([
@@ -108,6 +114,9 @@ export default function FormReview() {
     const [rejectReason, setRejectReason] = useState("");
     const [rejecting, setRejecting] = useState(false);
 
+    // NIN verification override gate (enroll confirm shown whenever NIN isn't "valid")
+    const [showNinConfirm, setShowNinConfirm] = useState(false);
+
     // Cascading dropdowns
     const [lgas, setLgas] = useState([]);
     const [wards, setWards] = useState([]);
@@ -194,6 +203,7 @@ export default function FormReview() {
 
     function loadForm(id) {
         setLoading(true);
+        warmNin(); // keep the NIN service token hot for every review page's auto-verify
         resetFormState();
         getForm(id)
             .then((res) => {
@@ -308,6 +318,17 @@ export default function FormReview() {
         getFacilities(fields.ward_no).then((r) => setFacilities(Array.isArray(r) ? r : r.data || [])).catch(() => {});
     }, [fields.ward_no]);
 
+    // ═══════════════ Live NIN verification ═══════════════
+    // Auto-verifies whenever NIN is 11 digits + DOB present. formKey resets the
+    // debounce per record so a pre-filled NIN verifies immediately on load.
+    const {
+        status: ninStatus,
+        details: ninDetails,
+        verifying: ninVerifying,
+        message: ninMessage,
+        reverify: reverifyNin,
+    } = useNinVerification(fields.dob, fields.nin, { formKey: currentFormId });
+
     // ═══════════════ Crop preview ═══════════════
 
     const generateCropPreview = useCallback(() => {
@@ -345,6 +366,14 @@ export default function FormReview() {
         if (!v) return "";
         const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         return m ? `${m[2]}-${m[3]}-${m[1]}` : v;
+    }
+
+    /** NIN service DOB `DD-MM-YYYY` (day-first, e.g. "12-09-2002") → ISO `YYYY-MM-DD`.
+     *  Returns "" if the shape is unrecognised so we never render a bogus mismatch. */
+    function ninDobToISO(v) {
+        if (!v) return "";
+        const m = String(v).match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+        return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
     }
 
     function unpackForm(d) {
@@ -399,31 +428,75 @@ export default function FormReview() {
         return null;
     }
 
+    // NIN demographic mismatches — only meaningful once the NIN is "valid".
+    // Names compare case-insensitively; DOB compares as ISO calendar dates.
+    // Blank NIN values are skipped: an empty field from the service is not a fix.
+    function getNinMismatches() {
+        if (ninStatus !== "valid" || !ninDetails) return [];
+        const norm = (s) => (s || "").trim().toLowerCase();
+        const rows = [];
+        const names = [
+            { key: "surname", label: "Surname", ninVal: ninDetails.lastName },
+            { key: "firstname", label: "First Name", ninVal: ninDetails.firstName },
+            { key: "othername", label: "Other Name", ninVal: ninDetails.middleName },
+        ];
+        for (const n of names) {
+            const ninVal = (n.ninVal || "").trim();
+            if (!ninVal) continue;
+            if (norm(ninVal) !== norm(fields[n.key])) {
+                const apply = titleCase(ninVal);
+                rows.push({ key: n.key, label: n.label, current: fields[n.key] || "—", display: apply, apply });
+            }
+        }
+        const ninIso = ninDobToISO(ninDetails.dateOfBirth);
+        if (ninIso && ninIso !== (fields.dob || "")) {
+            rows.push({ key: "dob", label: "Date of Birth", current: fields.dob || "—", display: ninIso, apply: ninIso });
+        }
+        return rows;
+    }
+
     // ═══════════════ Actions ═══════════════
 
     async function handleEnroll() {
+        if (!validateBeforeEnroll()) return;
+        // Enroll gate: only a live "valid" verdict enrolls straight through.
+        // Anything else — invalid, couldn't-verify, still-verifying, or never-run —
+        // routes through the override confirm modal.
+        if (ninStatus === "valid") {
+            doEnroll(true);
+        } else {
+            setShowNinConfirm(true);
+        }
+    }
+
+    function validateBeforeEnroll() {
         const missing = getMissingRequired();
         if (missing.length > 0) {
             toast.warn("Please fill all compulsory fields before enrolling");
-            return;
+            return false;
         }
         const ninErr = getNinError();
         const phoneErr = getPhoneError();
         if (ninErr || phoneErr) {
             toast.warn(ninErr || phoneErr);
-            return;
+            return false;
         }
         if (rotation !== 0 && !(cropCoords && cropCoords.xmax > 0) && !passportFile && !useAvatar) {
             toast.warn("Image was rotated — recrop the passport or upload a photo before enrolling");
-            return;
+            return false;
         }
+        return true;
+    }
 
+    async function doEnroll(ninVerified) {
+        setShowNinConfirm(false);
         setEnrolling(true);
         try {
             // Passport upload first: the backend's rotate check requires a
             // passport source to already exist when no fresh crop is sent
             if (passportFile) await uploadPassport(currentFormId, passportFile);
             const payload = { ...fields };
+            payload.nin_verified = ninVerified;
             if (payload.dob) payload.dob = dobFromISO(payload.dob);
             if (useAvatar) payload.use_avatar = true;
             if (rotation !== 0) payload.rotate_angle = rotation;
@@ -517,7 +590,7 @@ export default function FormReview() {
         return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-400">Form not found</div>;
     }
 
-    const isLocked = form.status?.toLowerCase() === "enrolled";
+    const isLocked = !canEdit(form.status);
     const displaySrc = rotation !== 0 ? (rotatedImgUrl || cachedImgUrl) : (cachedImgUrl || form.img_path);
     const passportSrc = passportFile
         ? URL.createObjectURL(passportFile)
@@ -525,9 +598,9 @@ export default function FormReview() {
             ? (fields.gender?.toLowerCase() === "male" ? form.MALE_AVATAR : form.FEMALE_AVATAR)
             : form.passport_path || croppedPreview || null;
 
-    const flagBanner = getFlagBanner(form);
     const ninError = touched.nin ? getNinError() : null;
     const phoneError = touched.phone_number ? getPhoneError() : null;
+    const ninMismatches = getNinMismatches();
 
     return (
         <div className="h-screen flex flex-col bg-slate-50">
@@ -576,7 +649,10 @@ export default function FormReview() {
                             </button>
                         </>
                     ) : (
-                        <span className="font-mono">Seq #{form.sequence}</span>
+                        <>
+                            <span className="font-mono">Seq #{form.sequence}</span>
+                            <FormActions form={form} variant="toolbar" onChanged={() => loadForm(currentFormId)} />
+                        </>
                     )}
                 </div>
             </div>
@@ -606,8 +682,11 @@ export default function FormReview() {
                             }
                         </div>
 
-                        {/* Flag banner */}
-                        {flagBanner}
+                        {/* Status + flag signals */}
+                        <div className="space-y-3">
+                            <StatusBanner form={form} />
+                            <FlagCallout form={form} />
+                        </div>
 
                         {/* ── Passport box ── */}
                         <div className="card p-6">
@@ -659,6 +738,19 @@ export default function FormReview() {
                                 ))}
                             </div>
                         </Section>
+
+                        {/* ── NIN verification ── */}
+                        <NinVerifyPanel
+                            nin={fields.nin}
+                            dob={fields.dob}
+                            status={ninStatus}
+                            verifying={ninVerifying}
+                            message={ninMessage}
+                            mismatches={ninMismatches}
+                            disabled={isLocked}
+                            onRetry={reverifyNin}
+                            onUse={updateField}
+                        />
 
                         {/* ── Location ── */}
                         <Section title="Location">
@@ -720,10 +812,9 @@ export default function FormReview() {
                             </div>
                         )}
 
-                        {isLocked && !isReviewMode && (
-                            <div className="text-center text-sm text-slate-500 py-6 border-t border-slate-100">
-                                This form has been <span className="font-semibold">{form.status?.toLowerCase()}</span>.
-                                {form.enrollee_number && <p className="mt-1 font-mono text-xs text-primary-600">Enrollee ID: {form.enrollee_number}</p>}
+                        {isLocked && !isReviewMode && form.enrollee_number && (
+                            <div className="text-center py-6 border-t border-slate-100">
+                                <p className="font-mono text-xs text-primary-600">Enrollee ID: {form.enrollee_number}</p>
                             </div>
                         )}
                     </div>
@@ -768,6 +859,16 @@ export default function FormReview() {
                     </div>
                 </div>
             )}
+
+            {showNinConfirm && (
+                <NinConfirmModal
+                    status={ninStatus}
+                    message={ninMessage}
+                    busy={enrolling}
+                    onCancel={() => setShowNinConfirm(false)}
+                    onConfirm={() => doEnroll(false)}
+                />
+            )}
         </div>
     );
 }
@@ -786,6 +887,15 @@ function fmtPace(secPerForm) {
     return secPerForm >= 60
         ? `${(secPerForm / 60).toFixed(1)} min/form`
         : `${Math.round(secPerForm)}s/form`;
+}
+
+/** Title-case a NIN-service name for display/apply ("JOSEPH" → "Joseph",
+ *  "MARY-JANE" → "Mary-Jane"). The service returns all-caps; the form stores
+ *  title-case, so we normalise before offering it as a quick-fix value. */
+function titleCase(s) {
+    return String(s || "")
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const SUMMARY_TONES = {
@@ -817,35 +927,6 @@ function Section({ title, children }) {
             <div className="mt-5">{children}</div>
         </fieldset>
     );
-}
-
-/* ── Flag banner ── */
-function getFlagBanner(form) {
-    const status = form.status?.toLowerCase();
-    if (status === "need_rescan" || status === "error" || status === "failed") {
-        const isError = status !== "need_rescan";
-        return (
-            <div className={`flex items-start gap-3 rounded-xl p-4 text-sm animate-fade-in ${isError ? "bg-red-50 border border-red-100 text-red-700" : "bg-amber-50 border border-amber-100 text-amber-700"}`}>
-                {isError ? <XCircle size={18} className="shrink-0 mt-0.5" /> : <AlertTriangle size={18} className="shrink-0 mt-0.5" />}
-                <div>
-                    <p className="font-semibold">{isError ? "Processing Error" : "Needs Rescan"}</p>
-                    {form.error_message && <p className="mt-1 text-xs opacity-80">{form.error_message}</p>}
-                </div>
-            </div>
-        );
-    }
-    if (status === "rejected" && form.reason) {
-        return (
-            <div className="flex items-start gap-3 rounded-xl p-4 text-sm bg-slate-100 border border-slate-200 text-slate-600 animate-fade-in">
-                <Info size={18} className="shrink-0 mt-0.5" />
-                <div>
-                    <p className="font-semibold">Rejected</p>
-                    <p className="mt-1 text-xs opacity-80">{form.reason}</p>
-                </div>
-            </div>
-        );
-    }
-    return null;
 }
 
 /* ── Field input ── */
@@ -925,4 +1006,146 @@ function FieldInput({ field, value, onChange, disabled, required, lgas, wards, f
     return (<div>{label}
         <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} disabled={disabled}
             placeholder={field.placeholder || ""} className={`${base} ${errorBorder}`} />{errorHint}</div>);
+}
+
+/* ── NIN verification panel ───────────────────────────────────────────────
+ * Presentational surface for the live NIN check. Renders nothing until the NIN
+ * is a well-formed 11 digits, then reflects the hook's verdict:
+ *   verifying → spinner    valid → green (+ demographic mismatch quick-fixes)
+ *   invalid   → red        error → amber (+ retry)
+ * "Use NIN value" writes the service's value straight into the matching field.
+ */
+const NIN_PANEL_TONES = {
+    valid: { border: "border-emerald-200", bg: "bg-emerald-50/60", icon: "text-emerald-500", title: "text-emerald-800" },
+    invalid: { border: "border-red-200", bg: "bg-red-50/60", icon: "text-red-500", title: "text-red-800" },
+    error: { border: "border-amber-200", bg: "bg-amber-50/60", icon: "text-amber-500", title: "text-amber-800" },
+    idle: { border: "border-slate-200", bg: "bg-slate-50", icon: "text-slate-400", title: "text-slate-700" },
+};
+
+function NinVerifyPanel({ nin, dob, status, verifying, message, mismatches, disabled, onRetry, onUse }) {
+    const eleven = /^\d{11}$/.test(nin || "");
+    if (!eleven) return null; // nothing to verify until the NIN is complete
+
+    // 11-digit NIN but no DOB → the hook can't fire; nudge for the missing input.
+    if (!dob) {
+        return (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center gap-2.5 text-sm text-slate-500">
+                <ShieldAlert size={16} className="text-slate-400 shrink-0" />
+                Enter date of birth to verify this NIN.
+            </div>
+        );
+    }
+
+    if (verifying) {
+        return (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center gap-2.5 text-sm text-slate-600">
+                <Loader2 size={16} className="animate-spin text-primary-500 shrink-0" />
+                Verifying NIN…
+            </div>
+        );
+    }
+
+    const tone = NIN_PANEL_TONES[status] || NIN_PANEL_TONES.idle;
+    const Icon = status === "valid" ? ShieldCheck : status === "error" ? AlertTriangle : ShieldAlert;
+    const heading = status === "valid" ? "NIN verified"
+        : status === "error" ? "Couldn't verify NIN"
+            : status === "invalid" ? "NIN could not be matched"
+                : "NIN not verified";
+
+    return (
+        <div className={`rounded-xl border ${tone.border} ${tone.bg} px-4 py-3.5 space-y-3`}>
+            <div className="flex items-center gap-2.5">
+                <Icon size={17} className={`${tone.icon} shrink-0`} />
+                <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${tone.title}`}>{heading}</p>
+                    {message && <p className="text-xs text-slate-500 mt-0.5">{message}</p>}
+                </div>
+                {status === "error" && (
+                    <button type="button" onClick={onRetry}
+                        className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors shrink-0">
+                        <RefreshCw size={12} /> Retry
+                    </button>
+                )}
+            </div>
+
+            {status === "valid" && mismatches.length > 0 && (
+                <div className="space-y-2 pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        {mismatches.length} field{mismatches.length !== 1 ? "s" : ""} differ from the NIN record
+                    </p>
+                    {mismatches.map((m) => (
+                        <div key={m.key} className="flex items-center gap-3 rounded-lg bg-white border border-slate-100 px-3 py-2">
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[11px] text-slate-400">{m.label}</p>
+                                <p className="text-sm truncate">
+                                    <span className="text-slate-400 line-through">{m.current}</span>
+                                    <span className="mx-1.5 text-slate-300">→</span>
+                                    <span className="font-semibold text-slate-800">{m.display}</span>
+                                </p>
+                            </div>
+                            <button type="button" disabled={disabled} onClick={() => onUse(m.key, m.apply)}
+                                className="rounded-lg bg-slate-800 text-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-900 disabled:opacity-40 transition-colors shrink-0">
+                                Use NIN value
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {status === "valid" && mismatches.length === 0 && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1.5">
+                    <CheckCircle size={13} /> All personal details match the NIN record.
+                </p>
+            )}
+        </div>
+    );
+}
+
+/* ── NIN override confirm ──────────────────────────────────────────────────
+ * Shown at enroll time whenever the live NIN verdict is anything other than a
+ * fresh "valid". Confirming records nin_verified:false; cancelling sends nothing.
+ */
+const NIN_CONFIRM_COPY = {
+    invalid: {
+        title: "NIN could not be matched",
+        body: "The NIN service ran but did not match this person's details. Enrolling now records the NIN as unverified.",
+    },
+    error: {
+        title: "NIN not verified",
+        body: "We couldn't reach the NIN service to verify this record. Enrolling now records the NIN as unverified — you can re-verify later.",
+    },
+    idle: {
+        title: "NIN not verified yet",
+        body: "This NIN hasn't been verified against the government service. Enrolling now records it as unverified.",
+    },
+};
+
+function NinConfirmModal({ status, message, busy, onCancel, onConfirm }) {
+    const copy = NIN_CONFIRM_COPY[status] || NIN_CONFIRM_COPY.idle;
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+            onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel(); }}>
+            <div className="card w-full max-w-sm p-6 text-center space-y-4 animate-scale-in" style={{ boxShadow: "var(--shadow-elevated)" }}>
+                <div className="mx-auto w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+                    <ShieldAlert size={26} className="text-amber-500" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-slate-900">{copy.title}</h2>
+                    <p className="text-sm text-slate-500 mt-1.5">{copy.body}</p>
+                    {message && <p className="text-xs text-slate-400 mt-2 italic">{message}</p>}
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={onCancel} disabled={busy}
+                        className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button onClick={onConfirm} disabled={busy}
+                        className="flex-1 rounded-xl bg-amber-500 text-white py-2.5 text-sm font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                        {busy && <Loader2 size={14} className="animate-spin" />}
+                        {busy ? "Enrolling…" : "Enroll anyway"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }

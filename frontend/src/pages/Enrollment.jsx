@@ -77,7 +77,12 @@ export default function Enrollment() {
                                             onClick={() => navigate(`/enrollment/batches/${batch.id}`)}
                                             className="border-b border-slate-50 hover:bg-primary-50/30 cursor-pointer transition-colors group"
                                         >
-                                            <td className="px-6 py-4 font-mono text-sm text-slate-700 group-hover:text-primary-700 transition-colors">{batch.id.slice(0, 8)}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-mono text-sm text-slate-700 group-hover:text-primary-700 transition-colors">{batch.id.slice(0, 8)}</div>
+                                                <div className="text-xs text-slate-400 mt-0.5">
+                                                    {batch.lga || batch.ward ? `${batch.lga || "—"} / ${batch.ward || "—"}` : "Location pending"}
+                                                </div>
+                                            </td>
                                             <td className="px-6 py-4 text-sm font-medium text-slate-600">{batch.total}</td>
                                             <td className="px-6 py-4"><StatusBadge status={batch.status} /></td>
                                             <td className="px-6 py-4 text-sm text-slate-500">

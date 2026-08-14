@@ -1,9 +1,10 @@
-import { LayoutDashboard, FileArchive, Activity } from "lucide-react";
+import { LayoutDashboard, FileArchive, Activity, ScanLine } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
     { icon: LayoutDashboard, name: "Dashboard", to: "/" },
     { icon: FileArchive, name: "Enrollment", to: "/enrollment" },
+    { icon: ScanLine, name: "NIN Validation", to: "/nin" },
 ];
 
 export default function Sidebar() {
