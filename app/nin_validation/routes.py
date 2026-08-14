@@ -1,11 +1,12 @@
 from app.nin_validation import nin_bp
 from app.nin_validation.schema import NINValidator, NINBatchValidator
-from flask import request, jsonify, url_for, stream_with_context
+from flask import request, jsonify, url_for, stream_with_context, send_file, Response
 from app.core.utils import serialize_validation_errors
 from app import kv
 from app.nin_validation.nin_services import NINServices
-from pydantic import ValidationError 
+from pydantic import ValidationError
 import json
+import os
 
 
 @nin_bp.post("/validate")
@@ -67,9 +68,16 @@ def nin_progress_stream(job_id:str):
         finally:
             subscriber.unsubscribe(channel)
             subscriber.close()
-                    
 
-
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 @nin_bp.get("/batch/<string:job_id>/status")
 def nin_status(job_id: str):
     payload = NINServices().get_batch_status(job_id)
@@ -82,14 +90,22 @@ def nin_status(job_id: str):
     })
 
 
+@nin_bp.get("/batch/<string:job_id>/download")
+def download_nin_batch(job_id: str):
+    download_type = request.args.get("download-type")
+    success, other =  NINServices().get_file_path(job_id, download_type)
+    if not success:
+        return jsonify({"success": False, "msg": other[1]}), 404
+    return send_file(other[0], as_attachment=True, download_name=other[1])
+ 
 
 @nin_bp.post("/batch/validate")
 def validate_nin_batch():
     try: 
         res = {"batch_file": request.files["batch_file"],
         "generate_report" : True if request.form.get("generate_report", "").lower() == "true" else False,
-        "aggregrate_by_lga_ward" : True if request.form.get("aggregrate_by_lga_ward", "").lower() == "true" else False,
-        "aggregrate_by_lga_facility" : True if request.form.get("aggregrate_by_lga_facility", "").lower() == "true" else False
+        "aggregate_by_lga_ward" : True if request.form.get("aggregate_by_lga_ward", "").lower() == "true" else False,
+        "aggregate_by_lga_facility" : True if request.form.get("aggregate_by_lga_facility", "").lower() == "true" else False
         }
 
         res = NINBatchValidator.model_validate(res)
@@ -106,7 +122,7 @@ def validate_nin_batch():
             "success": False,
             "msg": result.msg,
             "data" : {
-                "job_url": url_for("nin_validation.nin_status", batch_id=result.job_id)
+                "job_url": url_for("nin_validation.nin_status", job_id=result.job_id)
             }
         }), 409)
 
@@ -120,7 +136,7 @@ def validate_nin_batch():
         "success": True,
         "msg": result.msg,
         "data": {
-            "job_url": url_for("nin_validation.nin_progress_stream", batch_id=result.job_id)
+            "job_url": url_for("nin_validation.nin_progress_stream", job_id=result.job_id)
         }
     }))
 

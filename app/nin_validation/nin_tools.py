@@ -13,16 +13,17 @@ COLOR_MAP = {
     "Invalid NIN": "#e74c3c",
     "Empty NIN": "#e67e22",
     "Server Timeout / Unverifiable": "#3498db",
-    "Incomplete NIN": "#f1c40f"
+    "Incomplete NIN": "#f1c40f",
 }
 
 FALLBACK_COLORS = ["#8e44ad", "#16a085", "#d35400", "#7f8c8d", "#2c3e50"]
+
 
 def get_color_for_status(status_str: str) -> str:
     cleaned = str(status_str).strip()
     if cleaned in COLOR_MAP:
         return COLOR_MAP[cleaned]
-    
+
     status_lower = cleaned.lower()
     if "success" in status_lower:
         return "#2ecc71"
@@ -38,27 +39,38 @@ def get_color_for_status(status_str: str) -> str:
     return FALLBACK_COLORS[color_index]
 
 
-
 def generate_donut_chart(labels, values, center_text, output_path):
-    colors = [get_color_for_status(lbl) for lbl in labels] 
-    fig = go.Figure(data=[go.Pie(
-        labels=labels, 
-        values=values, 
-        hole=0.6,
-        marker=dict(colors=colors),
-        textinfo='label+percent',
-        hoverinfo='label+value+percent'
-    )])
-    
+    colors = [get_color_for_status(lbl) for lbl in labels]
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.6,
+                marker=dict(colors=colors),
+                textinfo="label+percent",
+                hoverinfo="label+value+percent",
+            )
+        ]
+    )
+
     fig.update_layout(
-        annotations=[dict(text=f"<b>{center_text:,}</b><br>Total Records", x=0.5, y=0.5, font_size=16, showarrow=False)],
+        annotations=[
+            dict(
+                text=f"<b>{center_text:,}</b><br>Total Records",
+                x=0.5,
+                y=0.5,
+                font_size=16,
+                showarrow=False,
+            )
+        ],
         showlegend=True,
         legend=dict(orient="v", x=1.05, y=0.5),
         margin=dict(t=20, b=20, l=20, r=20),
         width=700,
-        height=400
+        height=400,
     )
-    
+
     fig.write_image(output_path, scale=2)
 
 
@@ -69,20 +81,22 @@ def generate_lga_bar_charts(lga_pivot, output_dir):
     image_paths = []
 
     for i in range(total_chunks):
-        chunk_lgas = lgas[i*chunk_size : (i+1)*chunk_size]
+        chunk_lgas = lgas[i * chunk_size : (i + 1) * chunk_size]
         sub_df = lga_pivot.loc[chunk_lgas]
 
         fig = go.Figure()
         for col in sub_df.columns:
             color = get_color_for_status(col)
-            fig.add_trace(go.Bar(
-                x=sub_df.index,
-                y=sub_df[col],
-                name=col,
-                marker_color=color,
-                text=sub_df[col],
-                textposition='auto'
-            ))
+            fig.add_trace(
+                go.Bar(
+                    x=sub_df.index,
+                    y=sub_df[col],
+                    name=col,
+                    marker_color=color,
+                    text=sub_df[col],
+                    textposition="auto",
+                )
+            )
 
         start_lga = chunk_lgas[0]
         end_lga = chunk_lgas[-1]
@@ -90,13 +104,13 @@ def generate_lga_bar_charts(lga_pivot, output_dir):
 
         fig.update_layout(
             title=dict(text=title_text, x=0.5, font=dict(size=14)),
-            barmode='group',
+            barmode="group",
             yaxis_title="Record Count",
             xaxis=dict(tickangle=-25),
             legend=dict(title="Audit Status", x=1.02, y=1),
             margin=dict(t=60, b=80, l=50, r=50),
             width=900,
-            height=450
+            height=450,
         )
 
         out_path = os.path.join(output_dir, f"lga_chart_{i+1}.png")
@@ -105,21 +119,17 @@ def generate_lga_bar_charts(lga_pivot, output_dir):
 
     return image_paths
 
+
 async def render_pdf_from_html(html_content: str, output_pdf_path: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
-            headless=True, 
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
+            headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"]
         )
         context = await browser.new_context()
         page = await context.new_page()
-        
+
         await page.set_content(html_content, wait_until="networkidle")
-        
-        await page.pdf(
-            path=output_pdf_path,
-            format="A4",
-            print_background=True
-        )
+
+        await page.pdf(path=output_pdf_path, format="A4", print_background=True)
         await context.close()
         await browser.close()

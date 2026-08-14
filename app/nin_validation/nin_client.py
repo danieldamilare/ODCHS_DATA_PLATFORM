@@ -3,7 +3,11 @@ from requests.adapters import HTTPAdapter
 from app import kv
 import time
 from typing import Tuple, Optional, Dict, Any
-from app.nin_validation.nin_limiter import ACQUIRE_SCRIPT, RELEASE_SCRIPT, NoSlotAvailable
+from app.nin_validation.nin_limiter import (
+    ACQUIRE_SCRIPT,
+    RELEASE_SCRIPT,
+    NoSlotAvailable,
+)
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -16,6 +20,7 @@ from dataclasses import dataclass
 from redis.exceptions import LockError
 import contextlib
 import uuid
+import json
 
 _client = None
 
@@ -54,8 +59,8 @@ class NINClient:
         nin_validate_url,
         nin_server_token_url,
         nin_origin,
-        max_slot = 3,
-        request_ttl = 45_000
+        max_slot=3,
+        request_ttl=45_000,
     ):
         self.session = requests.Session()
         adapter = HTTPAdapter(pool_connections=15, pool_maxsize=25, max_retries=2)
@@ -106,16 +111,17 @@ class NINClient:
     @contextlib.contextmanager
     def acquire_slot(self):
         # print("Acquiring")
-        got = self.acquire_script(keys=[self.slots], args=[self.request_ttl, self.max_slot])
+        got = self.acquire_script(
+            keys=[self.slots], args=[self.request_ttl, self.max_slot]
+        )
         if not got:
             raise NoSlotAvailable("all NIN Slots leased")
         slot, fence = got[0], got[1]
-        try: 
+        try:
             yield slot
         finally:
             # print("releasing")
             self.release_script(keys=[self.slots], args=[slot, fence])
-
 
     def get_token(self) -> Tuple[str | None, float | None]:
         raw = self.kv.hgetall(self.token_key)
@@ -144,7 +150,7 @@ class NINClient:
         stop=stop_after_attempt(4),
         wait=wait_random(1, 2),
         retry=retry_if_exception_type(NoSlotAvailable),
-        reraise=True
+        reraise=True,
     )
     def _set_token_from_server(self):
         # t0 = time.perf_counter()
@@ -226,7 +232,7 @@ class NINClient:
         stop=stop_after_attempt(4),
         wait=wait_random(1, 2),
         retry=retry_if_exception_type(NoSlotAvailable),
-        reraise=True
+        reraise=True,
     )
     def post_request(
         self, url: str, json_data: Optional[Dict[str, Any]] = None, timeout=20
@@ -241,17 +247,11 @@ class NINClient:
         request_headers["application_crest"] = fresh_token
 
         try:
-            # t0 = time.perf_counter()
             with self.acquire_slot():
                 # t1 = time.perf_counter()
                 response = self.session.post(
                     url, json=json_data, headers=request_headers, timeout=timeout
                 )
-            # t2 = time.perf_counter()
-
-            # print(
-                # f"acquire={1000*(t1-t0):.2f}ms "
-                # f"http={1000*(t2-t1):.2f}ms")
 
             text = response.text.lower()
             headers = response.headers
@@ -293,6 +293,14 @@ class NINClient:
         return to_process
 
     def validate_nin(self, dob: date, nin: str) -> NINValidationResult:
+        key = f"nin:verified:{nin}"
+        if payload := self.kv.get(key):
+            result = json.loads(payload)
+            return NINValidationResult(
+                True,
+                result.get("responseMsg", "Successfully verified NIN"),
+                payload=result.get("details"),
+            )
         try:
             to_process = self.build_payload_from_dob(dob, nin)
             last_result = None
@@ -302,27 +310,39 @@ class NINClient:
                 try:
                     result = self.post_request(self.nin_validate_url, json_data=payload)
                     if result.get("responseCode", 0) == 200:
+                        payload = json.dumps(result)
+                        kv.set(key, payload)
+                        kv.expire(key, time=3600 * 6)
                         return NINValidationResult(
-                            True, result.get("responseMsg", "Successfully verified NIN"),
+                            True,
+                            result.get("responseMsg", "Successfully verified NIN"),
                             payload=result.get("details"),
                         )
-                    last_result = result                    
+                    last_result = result
                 except (NINServerError, NINValidatorError):
-                    had_sys_error = True                    
+                    had_sys_error = True
 
             if had_sys_error:
                 return NINValidationResult(False, "NIN server error", sys_err=True)
             if last_result:
+                self.kv.hset(key, mapping=last_result)
+                self.kv.expire(key, time=3600 * 6)
                 return NINValidationResult(
-                    False, last_result.get("responseMsg", "NIN Validation failed"),
+                    False,
+                    last_result.get("responseMsg", "NIN Validation failed"),
                     payload=last_result,
                 )
             return NINValidationResult(False, "NIN server error", sys_err=True)
         except NoSlotAvailable:
-            return NINValidationResult(False, "Server Overload.Please Retry", sys_err=True, retry=True)
+            return NINValidationResult(
+                False, "Server Overload.Please Retry", sys_err=True, retry=True
+            )
         except Exception:
-            return NINValidationResult(False, "Server Error while Validating", sys_err=True)
-    
+            return NINValidationResult(
+                False, "Server Error while Validating", sys_err=True
+            )
+
+
 def load_nin_client():
     from flask import current_app
 

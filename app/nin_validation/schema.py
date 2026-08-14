@@ -1,10 +1,18 @@
-from pydantic import BaseModel, field_validator, BeforeValidator, ConfigDict, model_validator
+from pydantic import (
+    BaseModel,
+    field_validator,
+    BeforeValidator,
+    ConfigDict,
+    model_validator,
+)
 from typing import Annotated, Any
 from datetime import date, datetime
 from app.nin_validation.utils import read_dataset_header
+from dateutil import parser
 import os
 
 from werkzeug.datastructures import FileStorage
+
 
 def parse_date(v: Any):
     if isinstance(v, datetime):
@@ -12,8 +20,9 @@ def parse_date(v: Any):
     if isinstance(v, date):
         return v
     if isinstance(v, str):
-        return datetime.strptime(v, "%d/%m/%Y").date()
+        return parser.parse(v).date()
     raise TypeError("Invalid date")
+
 
 def load_file_header(file: FileStorage):
     file.stream.seek(0)
@@ -44,21 +53,27 @@ class NINValidator(BaseModel):
 class NINBatchValidator(BaseModel):
     batch_file: FileStorage
     generate_report: bool = False
-    aggregrate_by_lga_ward: bool = False
-    aggregrate_by_lga_facility: bool =False
+    aggregate_by_lga_ward: bool = False
+    aggregate_by_lga_facility: bool = False
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_model(self):
         self.batch_file.stream.seek(0)
         file_name = self.batch_file.filename
 
-        if not file_name or os.path.splitext(file_name)[1].lower() not in (".csv", ".xlsx", ".xls"):
+        if not file_name or os.path.splitext(file_name)[1].lower() not in (
+            ".csv",
+            ".xlsx",
+            ".xls",
+        ):
             raise ValueError("Invalid File Type. Please upload an excel or csv file")
 
-        if self.aggregrate_by_lga_facility and self.aggregrate_by_lga_ward:
-            raise ValueError("You cannot breakdown by facility and ward at the same time. Please select one")
-       
+        if self.aggregate_by_lga_facility and self.aggregate_by_lga_ward:
+            raise ValueError(
+                "You cannot breakdown by facility and ward at the same time. Please select one"
+            )
+
         try:
             header_value = read_dataset_header(self.batch_file)
         except Exception:
@@ -67,12 +82,20 @@ class NINBatchValidator(BaseModel):
             raise ValueError("Error reading header from file")
         header_set = set(header_value)
 
-        compulsory_set = {'dob', 'nin'}
-        option_set = {'dob', 'nin', 'lga', 'ward', 'facility'}
+        compulsory_set = {"dob", "nin"}
+        option_set = {"dob", "nin", "lga", "ward", "facility"}
         missing = compulsory_set - header_set
         if missing:
-            raise ValueError(f"Columns: {missing} are needed for nin validation submisson")
-        if (self.generate_report or self.aggregrate_by_lga_ward or self.aggregrate_by_lga_facility) and (missing := option_set - header_set):
-            raise ValueError(f"Columns {missing} is missing, and needed for validation and report generation")
+            raise ValueError(
+                f"Columns: {missing} are needed for nin validation submisson"
+            )
+        if (
+            self.generate_report
+            or self.aggregate_by_lga_ward
+            or self.aggregate_by_lga_facility
+        ) and (missing := option_set - header_set):
+            raise ValueError(
+                f"Columns {missing} is missing, and needed for validation and report generation"
+            )
         self.batch_file.stream.seek(0)
         return self
