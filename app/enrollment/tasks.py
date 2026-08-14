@@ -132,10 +132,10 @@ def _finalize_image_processing(batch_name: str, batch_id: str, form: Form):
         status["status"] = "done"
         kv.delete(batch_name)
 
+    kv.publish(f"channel:{batch_id}", json.dumps(payload))
+
     status_payload = {"type": "status", **status}
     kv.publish(f"channel:{batch_id}", json.dumps(status_payload))
-
-    kv.publish(f"channel:{batch_id}", json.dumps(payload))
 
 
 def llm_extract(img_path):
@@ -246,9 +246,18 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
     total = int(kv.hget(kv_status_key, "total") or 0)
     kv.publish(
         f"channel:batch_idcard:{batch_id}",
-        json.dumps({"type": "fetch_progress", "fetched": fetched, "total": total, "enrollee_no": enroll_no, "success": outcome})
+        json.dumps(
+            {
+                "type": "fetch_progress",
+                "fetched": fetched,
+                "total": total,
+                "enrollee_no": enroll_no,
+                "success": outcome,
+            }
+        ),
     )
     return (path, result) if result else None
+
 
 @celery_app.task
 def generate_id_card(result, batch_id):
@@ -271,9 +280,9 @@ def generate_id_card(result, batch_id):
     def publish_update_idcard_status(event: ProgressEvent):
         completed = int(kv.hincrby(kv_batch_id_status, "completed", 1))
         all_data = kv.hgetall(kv_batch_id_status)
-        success = int(all_data.get('success', 0))
-        failed = int(all_data.get('failed', 0))
-        total = int(all_data.get('total', 0))
+        success = int(all_data.get("success", 0))
+        failed = int(all_data.get("failed", 0))
+        total = int(all_data.get("total", 0))
         if event.success:
             success = int(kv.hincrby(kv_batch_id_status, "success", 1))
             kv.sadd(kv_batch_id_name, event.path)
@@ -284,7 +293,7 @@ def generate_id_card(result, batch_id):
             "type": "generate_progress",
             "completed": completed,
             "total": total,
-            "status": all_data.get("status", ""), 
+            "status": all_data.get("status", ""),
             "failed": failed,
             "success": success,
         }
@@ -293,7 +302,7 @@ def generate_id_card(result, batch_id):
     generator = IdCardGenerator()
     generator.create_id_card_sync(to_generate, publish_update_idcard_status)
     kv.hset(kv_batch_id_status, "status", "done")
-    payload = {"type": "status", "status": "done"}
+    payload = {"type": "done"}
     kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
     kv.expire(kv_batch_id_name, 86400)
     kv.expire(kv_batch_id_status, 86400)
@@ -301,9 +310,7 @@ def generate_id_card(result, batch_id):
 
 @celery_app.task
 def start_id_card_generate_job(batch_id: str):
-    batch = db.session.scalar(
-        sa.select(Batch).where(Batch.uuid == batch_id)
-    )
+    batch = db.session.scalar(sa.select(Batch).where(Batch.uuid == batch_id))
     if not batch:
         return
     forms = db.session.scalars(
@@ -346,10 +353,10 @@ def start_id_card_generate_job(batch_id: str):
             "time_started": datetime.timestamp(datetime.now()),
         },
     )
-    
+
     if task_headers:
         callback = generate_id_card.s(batch_id)
         chord(task_headers)(callback)
     else:
-        payload = {"type": "status", "status": "done"}
+        payload = {"type": "done"}
         kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))

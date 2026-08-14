@@ -1,9 +1,6 @@
 import os
 
-
 class Config:
-    # --- File Upload & Safety Constraints ---
-    # 500 MB maximum threshold to handle massive field agent ZIP files safely
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))
     SECRET_KEY = os.getenv("SECRET_KEY")
@@ -27,8 +24,14 @@ class Config:
     NIN_SERVER_URL = os.getenv("NIN_SERVER_URL")
     NIN_ORIGIN = os.getenv("NIN_ORIGIN")
     SCRATCH_FILE_PATH = os.path.join(BASE_DIR, "temp")
+    DIAGNOSIS_FILE_PATH = os.path.join(BASE_DIR, "diagnosis.txt")
 
-
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_size": 10,
+        "max_overflow": 5,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True,
+    }
 
     HIS_SESSION_CONFIG = {
         "user_id": os.getenv("HIS_USER_ID"),
@@ -54,7 +57,6 @@ class Config:
     task_default_exchange = "io_bound"
     task_default_routing_key = "io_bound"
 
-
     broker_transport_options = {"visibility_timeout": 18000}
     broker_connection_retry_on_startup = True
 
@@ -62,8 +64,8 @@ class Config:
     task_publish_retry_policy = {
         "max_retries": 5,
         "interval_start": 0.2,
-        "interval_step": 0.5, 
-        "interval_max": 2.0,  
+        "interval_step": 0.5,
+        "interval_max": 2.0,
     }
 
     beat_schedule = {
@@ -72,3 +74,14 @@ class Config:
             "schedule": 60.0 * 5,
         },
     }
+
+    @classmethod
+    def init_app(cls):
+        os.makedirs(cls.FORM_PATH, exist_ok=True)
+        os.makedirs(cls.PASSPORT_PATH, exist_ok=True)
+        os.makedirs(cls.SCRATCH_FILE_PATH, exist_ok=True)
+
+
+os.makedirs(Config.FORM_PATH, exist_ok=True)
+os.makedirs(Config.PASSPORT_PATH, exist_ok=True)
+os.makedirs(Config.SCRATCH_FILE_PATH, exist_ok=True)

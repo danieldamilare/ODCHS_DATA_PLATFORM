@@ -21,8 +21,10 @@ class AllKeysExhausted(Exception):
 class LLMExtractionFailed(Exception):
     pass
 
+
 class ServerConnectionError(Exception):
     pass
+
 
 GEMINI_CIRCUIT = "Gemini:circuit_breaker"
 MODEL_NAME = "gemini-3.5-flash"
@@ -55,7 +57,7 @@ def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
         current_api_key = get_key()
 
         if current_api_key is None:
-            raise AllKeysExhausted()  
+            raise AllKeysExhausted()
 
         released = False
         try:
@@ -68,7 +70,9 @@ def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
             )
             print(f"Gemini call took {perf_counter() - t0:.3f}s")
 
-            release_key(current_api_key, to_cool=True, cooldown_time=SUCCESS_COOLDOWN_SECONDS)
+            release_key(
+                current_api_key, to_cool=True, cooldown_time=SUCCESS_COOLDOWN_SECONDS
+            )
             released = True
 
             if not response.text:
@@ -90,30 +94,49 @@ def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
             err_text = str(e).lower()
 
             if "429" in err_text or "quota" in err_text or "rate limit" in err_text:
-                release_key(current_api_key, to_cool=True, cooldown_time=RATE_LIMIT_COOLDOWN_SECONDS)
+                release_key(
+                    current_api_key,
+                    to_cool=True,
+                    cooldown_time=RATE_LIMIT_COOLDOWN_SECONDS,
+                )
                 released = True
                 time.sleep(1)
-                continue 
+                continue
 
-            elif any(s in err_text for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection")):
-                all_server_error_count +=1
-                release_key(current_api_key, to_cool=True, cooldown_time=TRANSIENT_COOLDOWN_SECONDS)
+            elif any(
+                s in err_text
+                for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection")
+            ):
+                all_server_error_count += 1
+                release_key(
+                    current_api_key,
+                    to_cool=True,
+                    cooldown_time=TRANSIENT_COOLDOWN_SECONDS,
+                )
                 released = True
                 attempt += 1
-                time.sleep(2 ** (attempt+1))
+                time.sleep(2 ** (attempt + 1))
                 continue
 
             else:
                 print("Unhandled Gemini error: ", e, traceback.format_exc())
-                release_key(current_api_key, to_cool=True, cooldown_time=TRANSIENT_COOLDOWN_SECONDS)
+                release_key(
+                    current_api_key,
+                    to_cool=True,
+                    cooldown_time=TRANSIENT_COOLDOWN_SECONDS,
+                )
                 released = True
                 raise
 
         finally:
             if not released:
-                release_key(current_api_key, to_cool=True, cooldown_time=TRANSIENT_COOLDOWN_SECONDS)
+                release_key(
+                    current_api_key,
+                    to_cool=True,
+                    cooldown_time=TRANSIENT_COOLDOWN_SECONDS,
+                )
 
     if all_server_error_count > (max_retries * 0.60):
         kv.setex(GEMINI_CIRCUIT, 360, "Server error")
-        raise  ServerConnectionError("Gemini server is unstable")
+        raise ServerConnectionError("Gemini server is unstable")
     raise LLMExtractionFailed(f"Max retries exceeded: {last_error}")

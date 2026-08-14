@@ -262,7 +262,7 @@ class BatchServices:
             file_name += "_" if file_name else ""
             file_name += loader.reverse_facility.get(str(f), "")
         file_name += "_" if file_name else ""
-        file_name += batch_dict["id"] +  ".zip"
+        file_name += batch_dict["id"] + ".zip"
 
         def yield_file():
             for cur in kv.smembers(kv_batch_id_name):

@@ -85,6 +85,7 @@ class Form(db.Model):
         "passport_xmax",
         "passport_ymax",
         "lga_no",
+        "nin_verified",
         "ward_no",
         "genotype",
         "occupation",
@@ -110,7 +111,9 @@ class Form(db.Model):
     category = db.Column(db.Integer, nullable=True)
     marital_status = db.Column(db.String(15), nullable=True)
 
-    batch_id = db.Column(db.Integer, db.ForeignKey("batches.id"), nullable=False, index=True)
+    batch_id = db.Column(
+        db.Integer, db.ForeignKey("batches.id"), nullable=False, index=True
+    )
     # enrollee_number is returned from the HIS, useful if we add ID card generation
     enrollee_number = db.Column(db.String, nullable=True, index=True)
     genotype = db.Column(db.String(3), nullable=True)
@@ -190,7 +193,9 @@ class Form(db.Model):
             "settlement": self.settlement,
             "lga": (loader.reverse_lga or {}).get(str(self.lga_no), None),
             "ward": (loader.reverse_ward or {}).get(str(self.ward_no), None),
-            "facility":(loader.reverse_facility or {}).get(str(self.facility_no), None),
+            "facility": (loader.reverse_facility or {}).get(
+                str(self.facility_no), None
+            ),
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,

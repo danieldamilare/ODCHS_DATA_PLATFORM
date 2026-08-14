@@ -1,5 +1,7 @@
 from app.enrollment.session import get_his_session
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
+from dateutil import parser, relativedelta
+
 from dataclasses import dataclass
 import requests
 from tenacity import (
@@ -11,6 +13,7 @@ from tenacity import (
 from enum import Enum, auto
 import base64
 from mimetypes import guess_type
+from datetime import datetime
 
 
 BASE = "https://odchc-his.org/administrator/functions"
@@ -43,6 +46,60 @@ class HISEnrollResult:
         )
 
 
+@dataclass
+class HISEnrolleeDetails:
+    disabled: bool
+    enrollee_type: str
+    policy_number: str
+    facility: str
+    ward: str
+    lga: str
+    surname: str
+    firstname: str
+    othername: str
+    dob: Optional[datetime]
+    gender: str
+
+    @property
+    def age(self) -> Optional[int]:
+        if not self.dob:
+            return None
+        diff = relativedelta.relativedelta(datetime.now(), self.dob)
+        return diff.years
+
+    @classmethod
+    def _parse_dob(cls, dob_str: Optional[str]) -> Optional[datetime]:
+        if not dob_str:
+            return None
+        try:
+            return parser.parse(dob_str)
+        except Exception:
+            return None
+
+    @classmethod
+    def from_dict(cls, item: Dict[str, Any]) -> "HISEnrolleeDetails":
+        """Factory method to convert a single item from coop_Enrollee into the dataclass."""
+        return cls(
+            disabled=bool(item.get("disabled", False)),
+            enrollee_type=item.get("enrollee_type", ""),
+            policy_number=item.get("enrolleeNo", ""),
+            facility=item.get("providerName", ""),
+            ward=item.get("ward", ""),
+            lga=item.get("city", ""),  # 'city' contains 'Akure South'
+            surname=item.get("surname", ""),
+            firstname=item.get("middleName", "").strip(),  # Strip trailing whitespace
+            othername=item.get("othername", ""),
+            dob=cls._parse_dob(item.get("dob_MM_dd_yyyy")),
+            gender=item.get("gender", ""),
+        )
+
+    @classmethod
+    def from_response(cls, response_json: Dict[str, Any]) -> List["HISEnrolleeDetails"]:
+        """Parses the entire response payload and returns a list of HISEnrolleeDetails."""
+        records = response_json.get("coop_Enrollee", [])
+        return [cls.from_dict(item) for item in records]
+
+
 class HISClient:
     def __init__(self, base_url=BASE):
         self.session = get_his_session()
@@ -56,11 +113,15 @@ class HISClient:
     )
     def _execute_post(
         self,
-        endpoint: str,
+        endpoint: Optional[str] = None,
+        param: Optional[Dict] = None,
         json_data: Optional[Dict] = None,
         raw_data: Optional[str] = None,
     ) -> Dict[str, Any]:
-        url = f"{self.base_url}?{endpoint}"
+
+        url = self.base_url
+        if endpoint:
+            url = f"{self.base_url}?{endpoint}"
         try:
             if json_data is not None:
                 res = self.session.post(url, json=json_data)
@@ -84,8 +145,12 @@ class HISClient:
         retry=retry_if_exception_type(IOError),
         reraise=True,
     )
-    def _execute_get(self, endpoint: str, param: Optional[Dict]) -> Dict[str, Any]:
-        url = f"{self.base_url}?{endpoint}"
+    def _execute_get(
+        self, endpoint: Optional[str] = None, param: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        url = self.base_url
+        if endpoint:
+            url = f"{self.base_url}?{endpoint}"
 
         try:
             res = self.session.get(url, params=param)
@@ -295,3 +360,27 @@ class HISClient:
             ],
             "children": [],
         }
+
+    def fetch_enrollee_details(self, policy_number: str):
+        original_policy_number = policy_number
+        policy_number = policy_number[-1] + "0"
+        params = {
+            "getBeneficiariesDepend": "",
+            "startDate": "",
+            "endDate": "",
+            "planType": "",
+            "lga": "",
+            "ward": "",
+            "provider_id": "",
+            "status": "active",
+            "scname": policy_number,
+        }
+        try:
+            result = self._execute_get(param=params)
+            list_dict = HISEnrolleeDetails.from_response(result)
+            for obj in list_dict:
+                if obj.policy_number == original_policy_number:
+                    return obj
+            return None
+        except:
+            return None

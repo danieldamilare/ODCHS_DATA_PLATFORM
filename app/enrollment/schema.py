@@ -2,10 +2,11 @@ from enum import Enum
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
 from werkzeug.datastructures import FileStorage
-from app.enrollment.utils import validate_zip_file
+from app.core.utils import validate_zip_file
 from app.enrollment.utils import is_image_extension
 from app.nin_validation.nin_client import load_nin_client
 from datetime import datetime
+from dateutil import parser
 
 
 class MaritalStatusEnum(str, Enum):
@@ -141,7 +142,7 @@ class FormUpdater(BaseModel):
     def validate_model(self):
         client = load_nin_client()
         if self.nin_verified:
-            dob = datetime.strptime(self.dob, "%m/%d/%Y").date()
+            dob = parser.parse(self.dob).date()
             result = client.validate_nin(dob, self.nin)
             if not result.success:
                 raise ValueError("NIN is not valid")

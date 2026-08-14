@@ -18,8 +18,8 @@ from app.enrollment.services import (
     FormServices,
     FormEnrollmentState,
     FormUpdateResult,
-    BatchIdCardJobResult, 
-    BatchIdCardDownloadResult
+    BatchIdCardJobResult,
+    BatchIdCardDownloadResult,
 )
 from app.enrollment.utils import serialize_validation_errors
 from app.enrollment.dataloader import get_loader
@@ -30,7 +30,6 @@ from app.core.utils import parse_opt_int
 from app import kv
 import json
 import os
-
 
 
 @enrollment_bp.route("/batches")
@@ -62,7 +61,7 @@ def batch_get():
 def batch_post():
     try:
         uploader = BatchUploader(
-            batch_file= request.files["batch_file"],
+            batch_file=request.files["batch_file"],
             lga_no=parse_opt_int(request.form.get("lga_no")),
             ward_no=parse_opt_int(request.form.get("ward_no")),
             facility_no=parse_opt_int(request.form.get("facility_no")),
@@ -110,6 +109,7 @@ def batch_post():
         202,
     )
 
+
 @enrollment_bp.get("/batches/<string:batch_id>")
 def get_batch_id(batch_id: str):
     batch_service = BatchServices()
@@ -134,9 +134,7 @@ def download_batch_forms(batch_id: str):
         return jsonify({"success": False, "msg": result.msg}), 404
 
     response = Response(result.generator, mimetype="application/zip")
-    response.headers["Content-Disposition"] = (
-        f"attachment; filename={result.filename}"
-    )
+    response.headers["Content-Disposition"] = f"attachment; filename={result.filename}"
     return response
 
 
@@ -220,7 +218,9 @@ def get_batch_progress_stream(batch_id: str):
 
             progress = kv.hgetall(f"batch:{batch_id}")
             if progress.get("status") == "done":
-                batch = db.session.execute(sa.select(Batch).where(Batch.id == batch.id)).scalar()
+                batch = db.session.execute(
+                    sa.select(Batch).where(Batch.id == batch.id)
+                ).scalar()
                 yield ("event: complete\n" f"data: {json.dumps(batch.to_dict())}\n\n")
                 return
 
@@ -235,23 +235,22 @@ def get_batch_progress_stream(batch_id: str):
                     continue
 
                 try:
-                    payload = json.loads(message["data"])
+                    payload = dict(json.loads(message["data"]))
                 except Exception:
                     continue
-
-                if payload["type"] == "form_ready":
-                    del payload["type"]
-                    yield ("event: form_ready\n" f"data: {json.dumps(payload)}\n\n")
-                elif payload["type"] == "status":
-                    del payload["type"]
-                    yield ("event: status\n" f"data: {json.dumps(payload)}\n\n")
-
-                if payload.get("status") == "done":
-                    batch = db.session.execute(sa.select(Batch).where(Batch.id == batch.id)).scalar()
+                event_type = payload.pop("type", "status")
+                if (
+                    event_type == "status" and payload.get("status") == "done"
+                ) or event_type == "done":
+                    batch = db.session.execute(
+                        sa.select(Batch).where(Batch.id == batch.id)
+                    ).scalar()
                     yield (
                         "event: complete\n" f"data: {json.dumps(batch.to_dict())}\n\n"
                     )
                     break
+                yield f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
+
         except Exception:
             yield ("event: error\n" 'data: {"message": "Connection lost"}\n\n')
 
@@ -270,6 +269,7 @@ def get_batch_progress_stream(batch_id: str):
         },
     )
 
+
 @enrollment_bp.post("/batches/<string:batch_id>/idcards")
 def start_id_card_generation(batch_id: str):
     batch_service = BatchServices()
@@ -280,11 +280,18 @@ def start_id_card_generation(batch_id: str):
     if result.status == "no_idcard":
         return jsonify({"success": False, "msg": result.msg}), 400
 
-    return jsonify({
-        "success": True,
-        "msg": result.msg,
-        "progress_url": url_for("enrollment.get_idcard_progress_stream", batch_id=batch_id),
-    }), 202
+    return (
+        jsonify(
+            {
+                "success": True,
+                "msg": result.msg,
+                "progress_url": url_for(
+                    "enrollment.get_idcard_progress_stream", batch_id=batch_id
+                ),
+            }
+        ),
+        202,
+    )
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/idcards/progress")
@@ -292,11 +299,22 @@ def get_idcard_progress_stream(batch_id: str):
     batch_service = BatchServices()
     batch = batch_service.get(batch_id)
     if batch is None:
-        return jsonify({"success": False, "msg": "No batch exists with the given id"}), 4040
+        return (
+            jsonify({"success": False, "msg": "No batch exists with the given id"}),
+            404,
+        )
     batch_status_id = f"batch_idcard_status:{batch_id}"
     current_batch_status = (kv.hget(batch_status_id, "status") or "").lower()
     if not current_batch_status:
-        return jsonify({"success": False, "msg": "No Id card generation for this batch has started"}), 404
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "msg": "No Id card generation for this batch has started",
+                }
+            ),
+            404,
+        )
 
     @stream_with_context
     def generate():
@@ -324,19 +342,14 @@ def get_idcard_progress_stream(batch_id: str):
                     yield ": heartbeat\n\n"
                     continue
 
-                if message is not None and message["type"] == "message":
-                    payload = json.loads(message["data"])
-                    if payload.get("type") == "status" and payload.get("status") == "done":
+                if message["type"] == "message":
+                    payload = dict(json.loads(message["data"]))
+                    event_type = payload.pop("type", "status")
+                    if event_type == "done":
                         snapshot = kv.hgetall(kv_status_key)
                         yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
                         break
-                    if payload.get("type") == "fetch_progress":
-                        yield f"event: fetch_progress\ndata: {json.dumps(payload)}\n\n"
-                        continue
-                    if payload.get("type") == "generate_progress":
-                        yield f"event: generate_progress\ndata: {json.dumps(payload)}\n\n"
-                        continue
-                    yield f"event: status\ndata: {json.dumps(payload)}\n\n"
+                    yield f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
                     continue
 
                 snapshot = kv.hgetall(kv_status_key)
@@ -350,13 +363,15 @@ def get_idcard_progress_stream(batch_id: str):
             subscriber.unsubscribe(f"channel:batch_idcard:{batch_id}")
             subscriber.close()
 
-    return Response(generate(), mimetype="text/event-stream", headers={
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
-        "Connection": "keep-alive",
-    })
-
-
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/idcards/download")
@@ -370,10 +385,11 @@ def download_idcards(batch_id: str):
         return jsonify({"success": False, "msg": result.msg}), 409
 
     response = Response(result.generator, mimetype="application/zip")
-    response.headers["Content-Disposition"] = f'attachment; filename="{result.filename}"'
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="{result.filename}"'
+    )
     response.headers["Cache-Control"] = "no-store"
     return response
-
 
 
 def _serve_form_file(asset_id: str, as_attachment: bool = False):
@@ -386,7 +402,7 @@ def _serve_form_file(asset_id: str, as_attachment: bool = False):
             os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
             os.path.basename(form.img_path),
             max_age=86400,
-            )
+        )
     else:
         return send_from_directory(
             os.path.join(current_app.config["FORM_PATH"], form.batch.uuid),
@@ -509,7 +525,7 @@ def rescan_form(form_id: str):
     if not new_image:
         return jsonify({"success": False, "msg": "No replacement image provided"}), 400
 
-    new_image.save(form.img_path)  
+    new_image.save(form.img_path)
     form.status = FormStatus.PENDING
     form.error_message = None
     form.reason = None
@@ -527,6 +543,13 @@ def reject_form(form_id: str):
         return (
             jsonify({"success": False, "msg": "No form exists with the given id"}),
             404,
+        )
+    if form.status == FormStatus.ENROLLED:
+        return jsonify(
+            {
+                "success": False,
+                "msg": "You cannot reject a form you've already enrolled",
+            }
         )
 
     reason = (request.get_json(silent=True) or {}).get("reason", "")
@@ -550,7 +573,10 @@ def enroll_form(form_id: str):
     if result.status == FormEnrollmentState.HIS_ERROR:
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 502
     if result.status == FormEnrollmentState.HIS_DUPLICATE:
-        return jsonify({"success": False, "status": "duplicate", "msg": result.msg}), 409
+        return (
+            jsonify({"success": False, "status": "duplicate", "msg": result.msg}),
+            409,
+        )
     return jsonify({"success": True, "status": "success", "msg": result.msg}), 200
 
 
@@ -602,7 +628,7 @@ def download_form_idcard(form_id: str):
                 download_name=result.filename,
             )
     else:
-        return (jsonify({'success': False, "msg": "Invalid download type"}), 400)
+        return (jsonify({"success": False, "msg": "Invalid download type"}), 400)
 
 
 @enrollment_bp.get("/lgas")
