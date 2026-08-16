@@ -382,5 +382,5 @@ class HISClient:
                 if obj.policy_number == original_policy_number:
                     return obj
             return None
-        except:
+        except Exception:
             return None

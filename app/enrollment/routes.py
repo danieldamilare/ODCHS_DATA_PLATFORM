@@ -195,6 +195,13 @@ def get_batch_progress_stream(batch_id: str):
 
             progress = kv.hgetall(f"batch:{batch_id}")
 
+            if progress.get("status") == "done":
+                batch = db.session.execute(
+                    sa.select(Batch).where(Batch.id == batch.id)
+                ).scalar()
+                yield ("event: complete\n" f"data: {json.dumps(batch.to_dict())}\n\n")
+                return
+
             yield ("event: status\n" f"data: {json.dumps(progress)}\n\n")
 
             stmt = sa.select(Form.uuid, Form.status).where(
@@ -334,6 +341,10 @@ def get_idcard_progress_stream(batch_id: str):
             subscriber.subscribe(f"channel:batch_idcard:{batch_id}")
 
             snapshot = kv.hgetall(kv_status_key)
+            if snapshot.get("status") == 'done':
+                yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
+                return 
+
             yield f"event: status\ndata: {json.dumps(snapshot)}\n\n"
 
             while True:
@@ -352,11 +363,6 @@ def get_idcard_progress_stream(batch_id: str):
                     yield f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
                     continue
 
-                snapshot = kv.hgetall(kv_status_key)
-                yield f"event: status\ndata: {json.dumps(snapshot)}\n\n"
-                if (snapshot.get("status") or "").lower() == "done":
-                    yield f"event: complete\ndata: {json.dumps(snapshot)}\n\n"
-                    break
         except Exception:
             yield f"event: error\ndata: {json.dumps({'message': 'Connection lost'})}\n\n"
         finally:

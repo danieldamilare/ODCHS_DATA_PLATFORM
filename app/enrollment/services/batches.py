@@ -229,6 +229,11 @@ class BatchServices:
                 "There are no ID card to generate for this batch, this can be because no form has been enroll, or all have already existed.",
             )
         kv_status_key = f"batch_idcard_status:{batch_id}"
+        if kv.exists(kv_status_key):
+            return BatchIdCardJobResult(
+                "started", "Id Card generation job has already started for this batch"
+            )
+
         kv.delete(kv_status_key)
         kv.hset(kv_status_key, "status", "started")
         start_id_card_generate_job.delay(batch_id)

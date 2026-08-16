@@ -5,7 +5,6 @@ from werkzeug.datastructures import FileStorage
 from app.core.utils import validate_zip_file
 from app.enrollment.utils import is_image_extension
 from app.nin_validation.nin_client import load_nin_client
-from datetime import datetime
 from dateutil import parser
 
 

@@ -30,6 +30,7 @@ from time import perf_counter
 import cv2
 import traceback
 from datetime import datetime
+from dataclasses import asdict
 
 
 @celery_app.task
@@ -256,7 +257,7 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
             }
         ),
     )
-    return (path, result) if result else None
+    return (path, asdict(result)) if result and result.success else None
 
 
 @celery_app.task
@@ -272,10 +273,10 @@ def generate_id_card(result, batch_id):
             continue
         path, cur = res
 
-        if not cur.success:
+        if not cur["success"]:
             kv.hincrby(kv_batch_id_status, "failed", 1)
             continue
-        to_generate.append((path, cur.payload))
+        to_generate.append((path, cur["payload"]))
 
     def publish_update_idcard_status(event: ProgressEvent):
         completed = int(kv.hincrby(kv_batch_id_status, "completed", 1))
@@ -339,7 +340,7 @@ def start_id_card_generate_job(batch_id: str):
             continue
 
         enrollee_number = form.enrollee_number
-        payload = {"path": id_path, "enroll_no": enrollee_number}
+        payload = {"path": id_path, "enroll_no": enrollee_number, "batch_id": batch_id}
         task_headers.append(get_his_id_card_payload.s(**payload))
 
     kv.hset(
@@ -350,6 +351,7 @@ def start_id_card_generate_job(batch_id: str):
             "success": already_succeed,
             "completed": already_succeed,
             "failed": 0,
+            "fetched": 0,
             "time_started": datetime.timestamp(datetime.now()),
         },
     )
