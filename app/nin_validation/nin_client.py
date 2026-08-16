@@ -59,7 +59,7 @@ class NINClient:
         nin_validate_url,
         nin_server_token_url,
         nin_origin,
-        max_slot=3,
+        max_slot=5,
         request_ttl=45_000,
     ):
         self.session = requests.Session()
@@ -240,17 +240,33 @@ class NINClient:
         json_data = json_data or {}
         request_headers = self.base_header.copy()
 
+
         fresh_token = self.fetch_valid_token()
         if not fresh_token:
+            print("No valid token, refreshing...")
+            t0 = time.perf_counter()
             fresh_token = self.refresh_token()
+            t1 = time.perf_counter()
+            print(
+                f"refresh_token={1000*(t1-t0):.2f}ms "
+            )
 
         request_headers["application_crest"] = fresh_token
 
         try:
+            t0 = time.perf_counter()
             with self.acquire_slot():
-                # t1 = time.perf_counter()
+                t1 = time.perf_counter()
+                print(
+                    f"acquire={1000*(t1-t0):.2f}ms "
+                )
+                t2 = time.perf_counter()
                 response = self.session.post(
                     url, json=json_data, headers=request_headers, timeout=timeout
+                )
+                t3 = time.perf_counter()
+                print(
+                    f"http={1000*(t3-t2):.2f}ms "
                 )
 
             text = response.text.lower()
@@ -292,7 +308,7 @@ class NINClient:
         to_process = [x for x in (payload1, payload2) if x]
         return to_process
 
-    def validate_nin(self, dob: date, nin: str) -> NINValidationResult:
+    def validate_nin(self, dob: date, nin: str, check_date_ambiguity=False) -> NINValidationResult:
         key = f"nin:verified:{nin}"
         if payload := self.kv.get(key):
             result = json.loads(payload)
@@ -303,6 +319,9 @@ class NINClient:
             )
         try:
             to_process = self.build_payload_from_dob(dob, nin)
+            if  not check_date_ambiguity:
+                to_process = [to_process[0]]
+
             last_result = None
             had_sys_error = False
 
@@ -325,8 +344,6 @@ class NINClient:
             if had_sys_error:
                 return NINValidationResult(False, "NIN server error", sys_err=True)
             if last_result:
-                self.kv.hset(key, mapping=last_result)
-                self.kv.expire(key, time=3600 * 6)
                 return NINValidationResult(
                     False,
                     last_result.get("responseMsg", "NIN Validation failed"),

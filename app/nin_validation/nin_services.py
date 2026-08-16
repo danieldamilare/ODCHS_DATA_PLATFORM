@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 from flask import current_app
-from typing import Literal, Optional, Dict, Any, Any
+from typing import Literal, Optional, Dict, Any
 import hashlib
 import pandas as pd
 from dataclasses import dataclass
@@ -47,7 +47,7 @@ class NINServices:
 
         data_type = get_dataset_type(file)
         dir_path = current_app.config["SCRATCH_FILE_PATH"]
-        file_name = secure_filename(file.file_name)
+        file_name = secure_filename(file.filename)
         try:
 
             if data_type != "csv":

@@ -6,7 +6,6 @@ from app import kv
 from app.nin_validation.nin_services import NINServices
 from pydantic import ValidationError
 import json
-import os
 
 
 @nin_bp.post("/validate")
@@ -40,7 +39,8 @@ def nin_progress_stream(job_id:str):
 
     @stream_with_context
     def generate():
-        nonlocal payload
+        nonlocal job_id, payload
+
         if payload.get("status") == "done":
             yield f"event: complete\ndata: {json.dumps(payload)}\n\n"
             return
@@ -49,7 +49,14 @@ def nin_progress_stream(job_id:str):
 
         try:
             subscriber.subscribe(channel)
-            yield f"event:status\ndata:{json.dumps(payload)}\n\n"
+            current_snapshot = NINServices().get_batch_status(job_id)
+
+            event_type = current_snapshot.pop("type", "status")
+            if event_type == "done" or current_snapshot.get("status") == "done":
+                yield f"event: complete\ndata: {json.dumps(current_snapshot)}\n\n"
+                return
+
+            yield f"event:status\ndata:{json.dumps(current_snapshot)}\n\n"
 
             while True:
                 message = subscriber.get_message(timeout=15)

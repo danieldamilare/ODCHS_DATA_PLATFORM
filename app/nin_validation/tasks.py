@@ -131,7 +131,7 @@ def generate_processing_queue_path(job_id, worker_no):
 def process_inline(job_id: str, job_result: str, payload: dict):
     client = load_nin_client()
     dob = datetime.strptime(payload["dob"], "%d/%m/%Y")
-    result = client.validate_nin(dob, payload["nin"])
+    result = client.validate_nin(dob, payload["nin"], check_date_ambiguity=True)
     idx = int(payload["idx"])
 
     if result.retry:
@@ -174,7 +174,7 @@ def process_nin_row(self, job_id: str, worker_no: int):
             process_inline(job_id, job_result, payload)
         except InlineRetry:
             raise self.retry(
-                countdown=60 * (self.request_retries + 1)
+                countdown=60 * (self.request.retries + 1)
             )  # avoid holding worker space hostage
         kv.rpop(processing_queue_path)
 
@@ -402,7 +402,7 @@ def finalize_nin_process(self, job_id: str):
             try:
                 process_inline(job_id, job_result, payload)
             except InlineRetry:
-                raise self.retry(countdown=60 * (self.request_retries + 1))
+                raise self.retry(countdown=60 * (self.request.retries + 1))
 
             kv.lpop(processing_queue_path)
         kv.delete(processing_queue_path)
