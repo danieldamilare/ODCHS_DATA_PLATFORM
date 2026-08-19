@@ -5,6 +5,7 @@ from app import db
 from itsdangerous import URLSafeTimedSerializer
 from flask import current_app
 import sqlalchemy as sa
+from flask_jwt_extended import get_jwt
 
 class AdminServices:
     def create_user(self, res: UserValidator):
@@ -12,6 +13,7 @@ class AdminServices:
         existing_user = db.session.scalar(sa.select(User).filter_by(email=res.email))
         if existing_user:
             return {"success": False, "msg": "A user with this email already exists"}
+
         new_user = User(
             first_name = res.first_name.strip().capitalize(),
             last_name= res.last_name.strip().capitalize(),
@@ -58,9 +60,13 @@ class AdminServices:
 
 
     def deactivate_user(self, user_id):
+        payload = get_jwt()
+        if payload.get("sub") == user_id:
+            return {"success": False, "msg": "You cannot deactivate yourself"}
+
         user = db.session.scalar(sa.select(User).filter_by(uuid=user_id))
         if not user:
-            return {"success": False, "msg": "You cannot deactive a user that does not exists"}
+            return {"success": False, "msg": "You cannot deactivate a user that does not exists"}
         user.status = UserStatus.DEACTIVATED
         db.session.commit()
         return {"success": True, "msg": f"Successfully deactivated user {user.first_name}"}

@@ -33,6 +33,7 @@ def validate_zip_file(file: FileStorage) -> FileStorage:
 def serialize_validation_errors(e: ValidationError) -> str:
     return "; ".join(err["msg"] for err in e.errors(include_url=False))
 
+
 def parse_opt_int(val: Optional[str]) -> Optional[int]:
     """Helper to convert form strings to int or None."""
     if val is None or val.strip() == "":

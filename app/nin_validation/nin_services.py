@@ -2,7 +2,8 @@ from app.nin_validation.nin_client import load_nin_client
 from app.nin_validation.schema import NINBatchValidator
 from app.nin_validation.utils import get_dataset_type
 from app.nin_validation.tasks import process_nin_batch_validation
-from typing import Tuple
+from app.nin_validation.keys import NINKeys
+from typing import Tuple, Literal, Optional, Dict, Any
 from datetime import date
 from app import kv
 import threading
@@ -10,7 +11,6 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 from flask import current_app
-from typing import Literal, Optional, Dict, Any
 import hashlib
 import pandas as pd
 from dataclasses import dataclass
@@ -39,7 +39,7 @@ class NINServices:
         checksum = hashlib.md5(file.read()).hexdigest()
         file.stream.seek(0)
 
-        if kv.exists(checksum):  # ooops you are only allowed one trial a day
+        if kv.exists(checksum):
             job_id = kv.get(checksum)
             return NINBatchResult(
                 "duplicate", "You already submitted this document", job_id
@@ -48,49 +48,51 @@ class NINServices:
         data_type = get_dataset_type(file)
         dir_path = current_app.config["SCRATCH_FILE_PATH"]
         file_name = secure_filename(file.filename)
-        try:
 
-            if data_type != "csv":
-                df = pd.read_excel(file.stream)
+        try:
+            if data_type != ".csv":
+                df = pd.read_excel(file.stream, engine="calamine", dtype=str)
                 name = os.path.splitext(file_name)[0]
                 new_path = os.path.join(dir_path, name) + ".csv"
-                df.to_csv(new_path)
+                df.to_csv(new_path, index=False)
             else:
                 new_path = os.path.join(dir_path, file_name)
                 file.save(new_path)
         except OSError:
             return NINBatchResult("save_error", "Error occured while saving your file")
+
         gen_id = str(uuid.uuid4())
-        job_id = "nin:batch:" + gen_id
+        job_id = NINKeys.get_job_key(gen_id)
 
         kv.set(checksum, gen_id)
         aggregate = None
+
         if res.aggregate_by_lga_facility:
             aggregate = "facility"
         elif res.aggregate_by_lga_ward:
             aggregate = "ward"
+
         mapping: Dict[Any, Any] = {
             "checksum": checksum,
             "path": new_path,
             "status": "loading",
             "completed": 0,
         }
+
         if aggregate:
             mapping.update({"aggregate": aggregate})
         if res.generate_report:
-            mapping.update({"generate_report": True})
-        kv.hset(
-            job_id,
-            mapping=mapping,
-        )
+            mapping.update({"generate_report": "true"})
 
-        process_nin_batch_validation.delay(job_id)
+        kv.hset(job_id, mapping=mapping)
+        process_nin_batch_validation.delay(gen_id)
+
         return NINBatchResult(
             "success", "NIN Batch Validation Job has successfully started", gen_id
         )
 
     def get_batch_status(self, job_id: str, with_stream=False):
-        real_id = "nin:batch:" + job_id
+        real_id = NINKeys.get_job_key(job_id)
         payload = kv.hgetall(real_id)
         if not payload:
             return None
@@ -99,45 +101,47 @@ class NINServices:
         new_payload["status"] = payload.get("status")
         new_payload["completed"] = payload.get("completed")
         new_payload["total"] = payload.get("total")
-        new_payload["aggregate"] = payload.get("aggregate")
+        new_payload["aggregate"] = True if payload.get("aggregate") else False
         new_payload["generate_report"] = payload.get("generate_report")
-        if payload["status"] != "done" and with_stream:
-            new_payload["channel"] = f"channel:{real_id}"
+        if payload.get("status") != "done" and with_stream:
+            new_payload["channel"] = NINKeys.get_job_channel(job_id)
         return new_payload
 
-    def get_file_path(self, job_id, file_type) -> Tuple[bool, Tuple[str, str]]:
+    def get_file_path(self, job_id: str, file_type: str) -> Tuple[bool, Tuple[str, str]]:
         if not file_type:
             return False, ("", "Please select a download type")
-        payload = self.get_batch_status(job_id)
-        if not payload:
-            return False, ("", "You didn't submit any job with this id")
 
-        real_id = f"nin:batch:{job_id}"
+        payload = self.get_batch_status(job_id)
+        if not payload or payload.get("status") != "done":
+            return False, ("", "You either didn't submit any job with this id or the job is still being processed")
+
+        clean_id = NINKeys.clean_id(job_id)
         mapping = {
-            "result": ("csv_result_path", "nin_result_", None),
+            "result": ("csv_result_path", f"nin_result_{clean_id}.csv", None),
             "breakdown": (
                 "csv_breakdown_result_path",
-                "nin_breakdown_",
+                f"nin_breakdown_{clean_id}.zip",
                 "You didn't generate a breakdown for this job",
             ),
             "report": (
                 "pdf_result_path",
-                "nin_report_",
-                "You didn't generate report for this job",
+                f"nin_report_{clean_id}.pdf",
+                "You didn't generate a report for this job",
             ),
         }
+
         if file_type not in mapping:
             return False, ("", "Invalid selected type")
 
-        field, prefix, not_generated_msg = mapping[file_type]
+        field, download_filename, not_generated_msg = mapping[file_type]
         if not_generated_msg and not payload.get(
             "aggregate" if file_type == "breakdown" else "generate_report"
         ):
             return False, ("", not_generated_msg)
 
-        download_path = str(kv.hget(real_id, field) or "")
-        file_path = os.path.basename(download_path)
-        file_path = file_path.removeprefix("nin:batch:")
-        if not download_path:
-            return False, ("", "Job is still processing, no file available yet")
-        return True, (download_path, prefix + file_path)
+        real_id = NINKeys.get_job_key(job_id)
+        download_path = kv.hget(real_id, field)
+        if not download_path or not os.path.exists(download_path):
+            return False, ("", "Requested file is not available on the server")
+
+        return True, (download_path, download_filename)

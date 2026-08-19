@@ -100,7 +100,7 @@ class User(db.Model):
 
 
 class UserSession(db.Model):
-    __tablename__ = "user_session"
+    __tablename__ = "user_sessions"
 
     id = db.Column(db.Integer, primary_key=True)
     tok_jti = db.Column(db.String(255), unique=True, nullable=False, index=True)

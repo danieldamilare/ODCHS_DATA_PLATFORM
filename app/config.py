@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 class Config:
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024
@@ -24,7 +26,11 @@ class Config:
     NIN_SERVER_URL = os.getenv("NIN_SERVER_URL")
     NIN_ORIGIN = os.getenv("NIN_ORIGIN")
     SCRATCH_FILE_PATH = os.path.join(BASE_DIR, "temp")
-    DIAGNOSIS_FILE_PATH = os.path.join(BASE_DIR, "diagnosis.txt")
+    DIAGNOSIS_FILE_PATH = os.path.join(BASE_DIR, "diagnosis_list.txt")
+    EMAIL_SENDER = "ODCHS <no-reply@odchs.danieldamilare.dev>"
+    RESEND_API_KEY = os.getenv('RESEND_API_KEY')
+    FRONTEND_URL = "http://localhost:5173"
+    JWT_COOKIE_CSRF_PROTECT = False
 
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": 10,
@@ -46,6 +52,9 @@ class Config:
         "Origin": os.getenv("HIS_WEBSITE_ORIGIN"),
         "Referer": os.getenv("HIS_WEBSITE_REFERER"),
     }
+    JWT_ACCESS_TOKEN_EXPIRES = 3600
+    JWT_REFRESH_TOKEN_EXPIRES = 30 * 24 * 3600
+    JWT_TOKEN_LOCATION = ["cookies"]
 
     broker_url = REDIS_URL
     task_acks_late = True

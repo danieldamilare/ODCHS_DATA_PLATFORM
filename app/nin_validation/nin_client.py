@@ -298,6 +298,7 @@ class NINClient:
         ) as e:
             raise NINServerError(str(e))
 
+
     def build_payload_from_dob(self, dob: date, nin: str):
         parsed_dob = dob.strftime("%d/%m/%Y")
         d, m, y = parsed_dob.strip().split("/")
@@ -307,6 +308,7 @@ class NINClient:
             payload2 = self._build_payload(m, d, y, nin)
         to_process = [x for x in (payload1, payload2) if x]
         return to_process
+
 
     def validate_nin(self, dob: date, nin: str, check_date_ambiguity=False) -> NINValidationResult:
         key = f"nin:verified:{nin}"

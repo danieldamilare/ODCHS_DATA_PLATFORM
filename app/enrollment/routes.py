@@ -12,6 +12,7 @@ from app.enrollment.models import BatchStatus, Batch, Form, FormStatus
 from app import db
 import sqlalchemy as sa
 from app.enrollment.schema import BatchUploader, FormPassPortUploader, FormUpdater
+from app.enrollment.keys import EnrollmentIdCardKeys, EnrollmentKeys
 from app.enrollment.services import (
     BatchServices,
     BatchJobResult,
@@ -189,11 +190,13 @@ def get_batch_progress_stream(batch_id: str):
             return
 
         subscriber = kv.pubsub(ignore_subscribe_messages=True)
+        channel = EnrollmentKeys.get_job_channel(batch_id)
+        job_key = EnrollmentKeys.get_job_key(batch_id)
 
         try:
-            subscriber.subscribe(f"channel:{batch_id}")
+            subscriber.subscribe(channel)
 
-            progress = kv.hgetall(f"batch:{batch_id}")
+            progress = kv.hgetall(job_key)
 
             if progress.get("status") == "done":
                 batch = db.session.execute(
@@ -223,7 +226,7 @@ def get_batch_progress_stream(batch_id: str):
 
             db.session.remove()
 
-            progress = kv.hgetall(f"batch:{batch_id}")
+            progress = kv.hgetall(job_key)
             if progress.get("status") == "done":
                 batch = db.session.execute(
                     sa.select(Batch).where(Batch.id == batch.id)
@@ -262,7 +265,7 @@ def get_batch_progress_stream(batch_id: str):
             yield ("event: error\n" 'data: {"message": "Connection lost"}\n\n')
 
         finally:
-            subscriber.unsubscribe(f"channel:{batch_id}")
+            subscriber.unsubscribe(channel)
             subscriber.close()
             db.session.remove()
 
@@ -310,7 +313,7 @@ def get_idcard_progress_stream(batch_id: str):
             jsonify({"success": False, "msg": "No batch exists with the given id"}),
             404,
         )
-    batch_status_id = f"batch_idcard_status:{batch_id}"
+    batch_status_id = EnrollmentIdCardKeys.get_job_key(batch_id)
     current_batch_status = (kv.hget(batch_status_id, "status") or "").lower()
     if not current_batch_status:
         return (
@@ -325,7 +328,7 @@ def get_idcard_progress_stream(batch_id: str):
 
     @stream_with_context
     def generate():
-        kv_status_key = f"batch_idcard_status:{batch_id}"
+        kv_status_key = EnrollmentIdCardKeys.get_job_key(batch_id)
         current_status = (kv.hget(kv_status_key, "status") or "").lower()
 
         if current_status == "done":
@@ -337,8 +340,10 @@ def get_idcard_progress_stream(batch_id: str):
         yield f"event: started\ndata:{json.dumps(payload)}\n\n"
 
         subscriber = kv.pubsub(ignore_subscribe_messages=True)
+        channel = EnrollmentIdCardKeys.get_job_channel(batch_id)
+
         try:
-            subscriber.subscribe(f"channel:batch_idcard:{batch_id}")
+            subscriber.subscribe(channel)
 
             snapshot = kv.hgetall(kv_status_key)
             if snapshot.get("status") == 'done':
@@ -366,7 +371,7 @@ def get_idcard_progress_stream(batch_id: str):
         except Exception:
             yield f"event: error\ndata: {json.dumps({'message': 'Connection lost'})}\n\n"
         finally:
-            subscriber.unsubscribe(f"channel:batch_idcard:{batch_id}")
+            subscriber.unsubscribe(channel)
             subscriber.close()
 
     return Response(

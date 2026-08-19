@@ -4,6 +4,7 @@ from flask import current_app
 from app.enrollment.utils import compute_hash, is_image_extension
 from app.enrollment.dataloader import get_loader
 from app.enrollment.tasks import extract_zip_for_processing, start_id_card_generate_job
+from app.enrollment.keys import EnrollmentKeys, EnrollmentIdCardKeys
 from werkzeug.datastructures import FileStorage
 from app import kv
 from stat import S_IFREG
@@ -105,7 +106,7 @@ class BatchServices:
             return BatchJobResult(status="duplicate", batch=existing)
 
         kv.hset(
-            f"batch:{batch.uuid}",
+            EnrollmentKeys.get_job_key(batch.uuid),
             mapping={
                 "status": "extracting",
                 "total": len(images),
@@ -228,7 +229,7 @@ class BatchServices:
                 "no_idcard",
                 "There are no ID card to generate for this batch, this can be because no form has been enroll, or all have already existed.",
             )
-        kv_status_key = f"batch_idcard_status:{batch_id}"
+        kv_status_key = EnrollmentIdCardKeys.get_job_key(batch_id)
         if kv.exists(kv_status_key):
             return BatchIdCardJobResult(
                 "started", "Id Card generation job has already started for this batch"
@@ -245,8 +246,8 @@ class BatchServices:
             return BatchIdCardDownloadResult(
                 "invalid", "No Batch exists with the given id"
             )
-        kv_batch_id_name = f"batch_idcard:{batch_id}"
-        kv_batch_id_status = f"batch_idcard_status:{batch_id}"
+        kv_batch_id_name = EnrollmentIdCardKeys.get_download_paths(batch_id)
+        kv_batch_id_status = EnrollmentIdCardKeys.get_job_key(batch_id)
         if (
             kv.exists(kv_batch_id_name) != 1
             or (kv.hget(kv_batch_id_status, "status") or "").lower() != "done"

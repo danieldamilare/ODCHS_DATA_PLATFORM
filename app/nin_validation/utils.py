@@ -28,14 +28,14 @@ def read_dataset_header(file: FileStorage) -> List[Any]:
 
     file.stream.seek(0)
 
-    if ext == "csv":
+    if ext == ".csv":
         reader = _get_csv_reader(file)
         try:
             return next(reader)
         except StopIteration:
             return []
 
-    elif ext in ("xls", "xlsx"):
+    elif ext in (".xls", ".xlsx"):
         workbook = CalamineWorkbook.from_filelike(file.stream)
         sheet = workbook.get_sheet_by_index(0)
         return next(sheet.iter_rows())

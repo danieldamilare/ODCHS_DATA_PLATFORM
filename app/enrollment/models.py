@@ -37,6 +37,7 @@ class Batch(db.Model):
     plan_id = db.Column(db.Integer, nullable=True)
     zip_hash = db.Column(db.Text, nullable=True, unique=True)
     forms = db.relationship("Form", backref="batch", lazy=True)
+    # job_id = db.Column(db.Integer, db.ForeignKey("jobs.id"), index=True)
 
     def to_dict(self):
         loader = get_loader()

@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 from typing import Optional
 import json
 from app.enrollment.utils import generate_id_card_path
+from app.enrollment.keys import EnrollmentKeys, EnrollmentIdCardKeys
 from app import celery_app, kv, db
 from app.enrollment.image_processing import (
     is_image_too_blurry,
@@ -35,7 +36,8 @@ from dataclasses import asdict
 
 @celery_app.task
 def extract_zip_for_processing(path: str, batch_id: str):
-    kv_batch_name = f"batch:{batch_id}"
+    kv_batch_name = EnrollmentKeys.get_job_key(batch_id)
+    channel = EnrollmentKeys.get_job_channel(batch_id)
 
     batch = db.session.scalar(sa.select(Batch).where(Batch.uuid == batch_id))
     print("Got batch", batch)
@@ -91,6 +93,9 @@ def extract_zip_for_processing(path: str, batch_id: str):
         kv.hset(kv_batch_name, mapping={"status": "PROCESSING"})
         os.remove(path)
 
+        status = kv.hgetall(kv_batch_name)
+        kv.publish(channel, json.dumps({"type": "status", **status}))
+
         job_group = group(process_image_pipeline.s(uuid) for uuid in form_uuids)
         job_group.apply_async()
 
@@ -132,11 +137,11 @@ def _finalize_image_processing(batch_name: str, batch_id: str, form: Form):
         db.session.commit()
         status["status"] = "done"
         kv.delete(batch_name)
-
-    kv.publish(f"channel:{batch_id}", json.dumps(payload))
+    channel = EnrollmentKeys.get_job_channel(batch_id)
+    kv.publish(channel, json.dumps(payload))
 
     status_payload = {"type": "status", **status}
-    kv.publish(f"channel:{batch_id}", json.dumps(status_payload))
+    kv.publish(channel, json.dumps(status_payload))
 
 
 def llm_extract(img_path):
@@ -186,7 +191,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
 
     batch = form.batch
     batch_id = batch.uuid
-    batch_name = f"batch:{batch_id}"
+    batch_name = EnrollmentKeys.get_job_key(batch_id)
 
     try:
         _process_image_pipeline(form, batch)
@@ -234,7 +239,8 @@ def reclaim_leased_api_keys():
 
 @celery_app.task
 def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
-    kv_status_key = f"batch_idcard_status:{batch_id}"
+    kv_status_key = EnrollmentIdCardKeys.get_job_key(batch_id)
+    channel = EnrollmentIdCardKeys.get_job_channel(batch_id)
     try:
         client = HISClient()
         result = client.fetch_id_details_from_his(enroll_no)
@@ -246,7 +252,7 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
     fetched = int(kv.hincrby(kv_status_key, "fetched", 1))
     total = int(kv.hget(kv_status_key, "total") or 0)
     kv.publish(
-        f"channel:batch_idcard:{batch_id}",
+        channel,
         json.dumps(
             {
                 "type": "fetch_progress",
@@ -262,8 +268,8 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
 
 @celery_app.task
 def generate_id_card(result, batch_id):
-    kv_batch_id_name = f"batch_idcard:{batch_id}"
-    kv_batch_id_status = f"batch_idcard_status:{batch_id}"
+    kv_batch_id_name = EnrollmentIdCardKeys.get_download_paths(batch_id)
+    kv_batch_id_status = EnrollmentIdCardKeys.get_job_key(batch_id)
 
     kv.hset(kv_batch_id_status, "status", "generating")
     to_generate = []
@@ -278,6 +284,8 @@ def generate_id_card(result, batch_id):
             continue
         to_generate.append((path, cur["payload"]))
 
+    channel = EnrollmentIdCardKeys.get_job_channel(batch_id)
+
     def publish_update_idcard_status(event: ProgressEvent):
         completed = int(kv.hincrby(kv_batch_id_status, "completed", 1))
         all_data = kv.hgetall(kv_batch_id_status)
@@ -290,6 +298,7 @@ def generate_id_card(result, batch_id):
         else:
             failed = int(kv.hincrby(kv_batch_id_status, "failed", 1))
 
+
         payload = {
             "type": "generate_progress",
             "completed": completed,
@@ -298,13 +307,13 @@ def generate_id_card(result, batch_id):
             "failed": failed,
             "success": success,
         }
-        kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
+        kv.publish(channel, json.dumps(payload))
 
     generator = IdCardGenerator()
     generator.create_id_card_sync(to_generate, publish_update_idcard_status)
     kv.hset(kv_batch_id_status, "status", "done")
     payload = {"type": "done"}
-    kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
+    kv.publish(channel, json.dumps(payload))
     kv.expire(kv_batch_id_name, 86400)
     kv.expire(kv_batch_id_status, 86400)
 
@@ -321,8 +330,8 @@ def start_id_card_generate_job(batch_id: str):
             Form.enrollee_number.isnot(None),
         )
     ).all()
-    kv_batch_id_name = f"batch_idcard:{batch_id}"
-    kv_batch_id_status = f"batch_idcard_status:{batch_id}"
+    kv_batch_id_name = EnrollmentIdCardKeys.get_download_paths(batch_id)
+    kv_batch_id_status = EnrollmentIdCardKeys.get_job_key(batch_id)
 
     if not forms:
         return
@@ -361,4 +370,4 @@ def start_id_card_generate_job(batch_id: str):
         chord(task_headers)(callback)
     else:
         payload = {"type": "done"}
-        kv.publish(f"channel:batch_idcard:{batch_id}", json.dumps(payload))
+        kv.publish(EnrollmentIdCardKeys.get_job_channel(batch_id), json.dumps(payload))

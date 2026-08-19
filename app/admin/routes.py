@@ -31,7 +31,20 @@ def create_user():
 def get_users():
     page = int(request.args.get("page", 1))
     count = int(request.args.get("count", current_app.config["DEFAULT_PAGINATION"]))
-    users = db.paginate(sa.select(User), page=page, per_page=count)
+    status = request.args.get("status")
+
+    stmt = sa.select(User)
+    if status:
+        try:
+            user_status = UserStatus(status)
+        except Exception:
+            return jsonify({
+                "success": False,
+                "msg": "Invalid Status passed"
+            }), 400
+
+        stmt = stmt.filter_by(status=user_status)
+    users = db.paginate(stmt, page=page, per_page=count)
 
     return jsonify({
         "success": True,

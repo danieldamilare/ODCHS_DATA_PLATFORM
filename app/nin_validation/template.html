@@ -1,47 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
+<title>NIN Verification Analytic Report</title>
 <style>
   @page {
     size: A4 portrait;
-    margin: 15mm;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 9px;
+      color: #94a3b8;
+    }
+  }
+  * {
+    box-sizing: border-box;
   }
   body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: #2c3e50;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    font-size: 13px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Report Title */
+  .report-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #1a252f;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    padding-bottom: 6px;
+  }
+
+  /* Section Headings */
+  .metrics-heading {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #2c3e50;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  /* Diamond Bullet List */
+  .bullet-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+  }
+  .bullet-list li {
+    position: relative;
+    padding-left: 24px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #34495e;
+  }
+  .bullet-list li::before {
+    content: "❖";
+    position: absolute;
+    left: 4px;
+    top: 0;
+    color: #2c3e50;
+    font-size: 11px;
+  }
+
+  .text-desc {
+    font-size: 13px;
+    color: #34495e;
+    margin: 14px 0 8px 0;
     line-height: 1.5;
   }
-  .header {
+
+  /* Chart Containers */
+  .chart-container {
     text-align: center;
-    border-bottom: 2px solid #2c3e50;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+    margin: 10px 0 20px 0;
   }
-  .header h1 {
-    margin: 0;
-    font-size: 22px;
-    letter-spacing: 1px;
-    color: #1a252f;
-  }
-  .metrics-container {
-    background: #f8f9fa;
-    border-left: 4px solid #3498db;
-    padding: 15px;
-    margin-bottom: 25px;
-    font-size: 14px;
-  }
-  .metrics-container ul {
-    margin: 5px 0 0 20px;
-    padding: 0;
-  }
-  .chart-box {
-    text-align: center;
-    margin-bottom: 30px;
-  }
-  .chart-box img {
+  .chart-container img {
     max-width: 100%;
     height: auto;
+    display: block;
+    margin: 0 auto;
   }
+
+  .chart-container-bar {
+    text-align: center;
+    margin: 10px 0 24px 0;
+  }
+  .chart-container-bar img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* Page Break */
   .page-break {
     page-break-before: always;
   }
@@ -49,49 +110,60 @@
 </head>
 <body>
 
-  <div class="header">
-    <h1>NIN VERIFICATION ANALYTIC REPORT</h1>
+  <!-- PAGE 1: OVERVIEW METRICS & DONUT BREAKDOWNS -->
+  <div class="report-title">
+    SOCU NIN VERIFICATION ANALYTIC REPORT
   </div>
 
-  <div class="metrics-container">
-    <strong>OVERVIEW METRICS:</strong><br>
-    Total Records: <strong>{{ total_records }}</strong><br>
-    Valid NIN: <strong>{{ valid_total }} ({{ valid_pct }}%)</strong><br>
-    Invalid NIN: <strong>{{ invalid_total }} ({{ invalid_pct }}%)</strong>
-  </div>
+  <div class="metrics-heading">OVERVIEW METRICS:</div>
+  <ul class="bullet-list">
+    <li>Total Records: &nbsp;<strong>{{ total_records }}</strong></li>
+    <li>Valid NIN: &nbsp;<strong>{{ valid_total }} ({{ valid_pct }}%)</strong></li>
+    <li>Invalid NIN: &nbsp;<strong>{{ invalid_total }} ({{ invalid_pct }}%)</strong></li>
+  </ul>
 
-  <p>The chart below shows the overall verification outcome across all submitted records, classified as either Valid or Invalid.</p>
-  
-  <div class="chart-box">
-    <img src="{{ donut_1_path }}">
-  </div>
+  <p class="text-desc">
+    The chart below shows the overall verification outcome across all submitted records, classified as either Valid or Invalid.
+  </p>
 
-  <div class="metrics-container">
+  {% if donut_1_path %}
+  <div class="chart-container">
+    <img src="{{ donut_1_path }}" alt="Overall NIN Verification Status">
+  </div>
+  {% endif %}
+
+  <p class="text-desc">
     Invalid records are further broken down into failure categories:
-    <ul>
-      {% for reason, count in nin_breakdown.items() %}
-        <li><strong>{{ reason }}:</strong> {{ count }}</li>
-      {% endfor %}
-    </ul>
-  </div>
+  </p>
 
-  <div class="chart-box">
-    <img src="{{ donut_2_path }}">
-  </div>
+  {% if nin_breakdown %}
+  <ul class="bullet-list">
+    {% for reason, count in nin_breakdown.items() %}
+    <li>{{ reason }}: &nbsp;<strong>{{ count }}</strong></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
 
-  <!-- PAGE 2+: LGA BREAKDOWNS -->
+  {% if donut_2_path %}
+  <div class="chart-container">
+    <img src="{{ donut_2_path }}" alt="Verification Outcome Breakdown">
+  </div>
+  {% endif %}
+
+  <!-- PAGE 2+: LGA BREAKDOWNS (If Available) -->
+  {% if lga_chart_paths and lga_chart_paths|length > 0 %}
   <div class="page-break"></div>
   
-  <div class="header">
-    <h1>LGA BREAKDOWN ANALYSIS</h1>
-  </div>
-  <p>The charts below present the verification breakdown by Local Government Area (LGA), grouped six per chart for readability.</p>
+  <p class="text-desc" style="margin-top: 0; margin-bottom: 16px;">
+    The charts below present the same verification breakdown by Local Government Area, grouped six per chart for readability.
+  </p>
 
   {% for chart_img in lga_chart_paths %}
-    <div class="chart-box">
-      <img src="{{ chart_img }}">
+    <div class="chart-container-bar">
+      <img src="{{ chart_img }}" alt="LGA Verification Breakdown Chart">
     </div>
   {% endfor %}
+  {% endif %}
 
 </body>
 </html>
