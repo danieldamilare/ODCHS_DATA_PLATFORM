@@ -41,6 +41,7 @@ def create_app(config=Config):
     from app.auth import models as auth_models
     from app.encounter import models as encounter_models
     from app.enrollment import models as enrollment_models
+    from app.jobs import models as job_models
 
     app.register_blueprint(enrollment_bp)
     app.register_blueprint(auth_bp)
