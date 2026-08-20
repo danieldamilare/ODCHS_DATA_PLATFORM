@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from app.enrollment.his_client import HISClient
 from app.encounter.disease_classifier import classify_diagnosis
+import traceback
 
 
 @dataclass
@@ -29,8 +30,7 @@ def read_into_df(file_path, sheet_name=0, nrows=None, header=0):
     else:
         engine = "odf" if ext == ".ods" else "calamine"
         return pd.read_excel(
-            file_path, sheet_name=sheet_name, nrows=nrows, engine=engine,
-            header=header
+            file_path, sheet_name=sheet_name, nrows=nrows, engine=engine, header=header
         )
 
 
@@ -126,7 +126,7 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         df = read_into_df(
             file_path=file_path,
             sheet_name=metadata["sheet_name"],
-            header=metadata["header_row"],
+            header=int(metadata["header_row"]),
         )
         df.dropna(axis=0, how="all", inplace=True)
         columns = list(df.columns)
@@ -135,20 +135,22 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
             columns[int(value)] = key
 
         columns = [
-            re.sub(r"[^a-z0-9]", "", col.lower().strip().replace(" ", "_"))
+            re.sub(r"[^a-z0-9]", "_", col.lower().strip().replace(" ", "_"))
             for col in columns
         ]
         df.columns = columns
         df["facility"] = facility_name
         df.dropna(axis=1, how="all", inplace=True)
-
         df = merge_spilled_diagnosis(df)
+
         needed_column = ["policy_number", "age", "sex", "diagnosis", "client_name"]
         last_valid = df[needed_column].notna().any(axis=1)
         df = df[last_valid]
         df.reset_index(drop=True, inplace=True)
         df["s/n"] = range(1, len(df) + 1)  # use to mark index for us later to value
+
         if df.empty:
+
             return DataFrameProcessResult(
                 success=False, err_msg=f"{file_path} is empty."
             )
@@ -179,11 +181,12 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
                     found_count += 1
                     s_n = to_find.loc[idx, "s/n"]
                     df.loc[df["s/n"] == s_n, "age_numeric"] = res.age
-                    gender_clean = "Female" if "f" in str(res.gender).lower() else "Male"
+                    gender_clean = (
+                        "Female" if "f" in str(res.gender).lower() else "Male"
+                    )
                     df.loc[df["s/n"] == s_n, "sex"] = gender_clean
 
         remaining = missing_count - found_count
-
 
         sex_raw = df["sex"].astype(str).str.strip().str.lower()
         missing_sex_mask = sex_raw.isin(["", "nan", "nat", "none"])
@@ -193,8 +196,8 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
             return DataFrameProcessResult(
                 success=False,
                 err_msg=f"Rejected: Missing age exceeds 50% ({missing_age_mask.sum()}/{len(df)})",
-                missing_sex_count = int(missing_sex_mask.sum()),
-                missing_age_count= int(missing_age_mask.sum())
+                missing_sex_count=int(missing_sex_mask.sum()),
+                missing_age_count=int(missing_age_mask.sum()),
             )
 
         if missing_sex_mask.any():
@@ -220,21 +223,23 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
 
         for col in df.select_dtypes(include="object").columns:
             df[col] = df[col].map(sanitize_excel_value)
+
         return DataFrameProcessResult(
-        success=True,
-        data=df,
-        missing_sex_count=int(missing_sex_mask.sum()),
-        missing_age_count=int(missing_age_mask.sum()),
+            success=True,
+            data=df,
+            missing_sex_count=int(missing_sex_mask.sum()),
+            missing_age_count=int(missing_age_mask.sum()),
         )
     except Exception as e:
+        traceback.print_exc()
         return DataFrameProcessResult(success=False, err_msg=str(e))
 
 
 def process_df(df: pd.DataFrame, master_diagnosis_list):
     age_order = ["<1", "1-5", "6-14", "15-19", "20-44", "45-64", "65&AB"]
     sex_order = ["Male", "Female"]
-    all_cols = pd.MultiIndex.from_product([age_order, sex_order], names=['age', 'sex'])
-    df['s/n'] = range(1, len(df) + 1)
+    all_cols = pd.MultiIndex.from_product([age_order, sex_order], names=["age", "sex"])
+    df["s/n"] = range(1, len(df) + 1)
 
     try:
         enc_table = df.pivot_table(
@@ -242,46 +247,55 @@ def process_df(df: pd.DataFrame, master_diagnosis_list):
             columns=["age", "sex"],
             values="s/n",
             fill_value=np.nan,
-            aggfunc='count',
+            aggfunc="count",
             observed=True,
         )
         enc_table.index.name = "Facility"
         enc_table = enc_table.reindex(columns=all_cols, fill_value=np.nan)
-        classified = classify_diagnosis(df['diagnosis'].tolist())
-        df['classified_diagnosis'] = classified
-        df = df.explode('classified_diagnosis').reset_index(drop=True)
-        df['diagnosis'] = df['classified_diagnosis']
-        facility = df['facility'].iloc[0]
+        classified = classify_diagnosis(df["diagnosis"].tolist())
+        df["classified_diagnosis"] = classified
+        df = df.explode("classified_diagnosis").reset_index(drop=True)
+        df["diagnosis"] = df["classified_diagnosis"]
+        facility = df["facility"].iloc[0]
 
         report_table = df.pivot_table(
-            index='diagnosis', 
-            columns = ['age', 'sex'],
-            values = "s/n",
-            aggfunc='count',
-            fill_value= np.nan,
-            observed= True
+            index="diagnosis",
+            columns=["age", "sex"],
+            values="s/n",
+            aggfunc="count",
+            fill_value=np.nan,
+            observed=True,
         )
 
         report_table = report_table.reindex(columns=all_cols, fill_value=np.nan)
         report_table = report_table.reindex(index=master_diagnosis_list)
 
-        report_table[('Total', 'Male')]        = report_table.loc[:, (slice(None), 'Male')].sum(axis=1, min_count=1)
-        report_table[('Total', 'Female')]      = report_table.loc[:, (slice(None), 'Female')].sum(axis=1, min_count=1)
-        report_table[('Total', 'Grand Total')] = report_table[[('Total', 'Male'), ('Total', 'Female')]].sum(axis=1, min_count=1)
-        return  facility, enc_table, report_table
+        report_table[("Total", "Male")] = report_table.loc[
+            :, (slice(None), "Male")
+        ].sum(axis=1, min_count=1)
+        report_table[("Total", "Female")] = report_table.loc[
+            :, (slice(None), "Female")
+        ].sum(axis=1, min_count=1)
+        report_table[("Total", "Grand Total")] = report_table[
+            [("Total", "Male"), ("Total", "Female")]
+        ].sum(axis=1, min_count=1)
+        return facility, enc_table, report_table
     except Exception:
         return None, None, None
 
-def save_to_file(encounter_df: pd.DataFrame, utilization_list: Dict, output_filename: str):
+
+def save_to_file(
+    encounter_df: pd.DataFrame, utilization_list: Dict, output_filename: str
+):
     used_sheet_names = set()
 
     try:
-        with pd.ExcelWriter(output_filename, engine='openpyxl') as writer:
+        with pd.ExcelWriter(output_filename, engine="openpyxl") as writer:
 
             print("Saving Encounter report...")
 
-            encounter_df.to_excel(writer, sheet_name='Encounter Report')
-            used_sheet_names.add('Encounter Report')
+            encounter_df.to_excel(writer, sheet_name="Encounter Report")
+            used_sheet_names.add("Encounter Report")
 
             print(f"Saving {len(utilization_list)} facility utilization reports...")
 
@@ -299,7 +313,9 @@ def save_to_file(encounter_df: pd.DataFrame, utilization_list: Dict, output_file
                     count += 1
 
                     if count > 100:
-                        print(f" - Collision limit reached for {facility_name}. Using unique index.")
+                        print(
+                            f" - Collision limit reached for {facility_name}. Using unique index."
+                        )
                         sheet_name = f"Facility_{id(report_df) % 10000}"
                         break
 
@@ -311,3 +327,4 @@ def save_to_file(encounter_df: pd.DataFrame, utilization_list: Dict, output_file
 
     except Exception as e:
         print(f"Critical Error during file save: {e}")
+

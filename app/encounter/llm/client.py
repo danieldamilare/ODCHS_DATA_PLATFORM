@@ -9,9 +9,10 @@ from tenacity import (
 from flask import current_app
 from typing import Optional, Any, Callable, Literal
 from groq import Groq, RateLimitError
+from app.encounter.keys import EncounterKeys
 import os
 
-RATE_LIMIT_PAUSE_KEY = "encounter:groq:rate_limit"
+RATE_LIMIT_PAUSE_KEY = EncounterKeys.RATE_LIMIT_PAUSE_KEY
 
 
 def wait_for_rate_limit_clear():
