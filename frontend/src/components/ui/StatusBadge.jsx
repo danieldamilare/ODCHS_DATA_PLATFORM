@@ -1,10 +1,14 @@
 import { getStatusConfig } from "../../constants/formStatus";
 
-// Batch-only statuses (not in form descriptor)
-const BATCH_EXTRA = {
+// Batch & User statuses (not in form descriptor)
+const STATUS_EXTRA = {
     processing: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", label: "Processing" },
     extracting: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500", label: "Extracting" },
     done: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Done" },
+    active: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Active" },
+    pending: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500", label: "Pending" },
+    deactivated: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", label: "Deactivated" },
+    expired: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", label: "Expired" },
 };
 
 export default function StatusBadge({ status }) {
@@ -23,15 +27,15 @@ export default function StatusBadge({ status }) {
         );
     }
 
-    // Fall back to batch-extra
-    const batchConfig = BATCH_EXTRA[key];
-    if (batchConfig) {
+    // Fall back to extra statuses
+    const extraConfig = STATUS_EXTRA[key];
+    if (extraConfig) {
         return (
             <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${batchConfig.bg} ${batchConfig.text}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${extraConfig.bg} ${extraConfig.text}`}
             >
-                <span className={`w-1.5 h-1.5 rounded-full ${batchConfig.dot}`} />
-                {batchConfig.label}
+                <span className={`w-1.5 h-1.5 rounded-full ${extraConfig.dot}`} />
+                {extraConfig.label}
             </span>
         );
     }
