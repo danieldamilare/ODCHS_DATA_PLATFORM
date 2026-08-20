@@ -23,7 +23,13 @@ class User(db.Model):
     __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
-    uuid = db.Column(db.String(36), unique=True, default=lambda: str(uuid4()), nullable=False, index=True)
+    uuid = db.Column(
+        db.String(36),
+        unique=True,
+        default=lambda: str(uuid4()),
+        nullable=False,
+        index=True,
+    )
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
@@ -32,7 +38,11 @@ class User(db.Model):
     role = db.Column(db.Enum(UserRole), default=UserRole.USER, nullable=False)
 
     expiry_date = db.Column(db.DateTime(timezone=True), nullable=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
     last_login = db.Column(db.DateTime(timezone=True), nullable=True)
 
     def to_dict(self, include_sensitive: bool = False) -> dict:
@@ -60,10 +70,11 @@ class User(db.Model):
                 expiry = expiry.replace(tzinfo=timezone.utc)
             return expiry < datetime.now(timezone.utc)
         return False
- 
 
     @classmethod
-    def verify_user(cls, email: str, password: str) -> Tuple[bool, Optional["User"], str]:
+    def verify_user(
+        cls, email: str, password: str
+    ) -> Tuple[bool, Optional["User"], str]:
         _DUMMY_HASH = "pbkdf2:sha256:260000$dummy$00000000000000000000000000000000"
 
         user = db.session.scalar(sa.select(cls).filter_by(email=email.lower().strip()))
@@ -93,7 +104,7 @@ class User(db.Model):
             return False, None, "Account has expired"
 
         return True, user, "Authentication successful"
-   
+
     def set_password(self, password: str) -> "User":
         self.password_hash = generate_password_hash(password)
         return self
@@ -104,5 +115,15 @@ class UserSession(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     tok_jti = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    user_uuid = db.Column(db.String(36), db.ForeignKey("user.uuid", ondelete="CASCADE"), nullable=False, index=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    user_uuid = db.Column(
+        db.String(36),
+        db.ForeignKey("user.uuid", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+

@@ -14,18 +14,27 @@ def validate_nin():
     try:
         res = NINValidator.model_validate(request.get_json(silent=True))
     except ValidationError as e:
-        return jsonify(
-            {
-                "success": False,
-                "msg": serialize_validation_errors(e)
-            }
-        ), 400
+        return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
 
     result = NINServices().validate_nin(res.dob, res.nin)
     if not result.sys_err:
-        return (jsonify({"success": result.success, "message": result.msg, "data": result.payload}), 200)
+        return (
+            jsonify(
+                {
+                    "success": result.success,
+                    "message": result.msg,
+                    "data": result.payload,
+                }
+            ),
+            200,
+        )
 
-    return (jsonify({"success": result.success, "message": result.msg, "data": result.payload}), 500)
+    return (
+        jsonify(
+            {"success": result.success, "message": result.msg, "data": result.payload}
+        ),
+        500,
+    )
 
 
 @nin_bp.post("/warm")
@@ -38,7 +47,12 @@ def warm_cache():
 def nin_progress_stream(job_id: str):
     payload = NINServices().get_batch_status(job_id, with_stream=True)
     if not payload:
-        return jsonify({"success": False, "msg": "You didn't submit any job with this id"}), 404
+        return (
+            jsonify(
+                {"success": False, "msg": "You didn't submit any job with this id"}
+            ),
+            404,
+        )
 
     @stream_with_context
     def generate():
@@ -55,8 +69,12 @@ def nin_progress_stream(job_id: str):
             subscriber.subscribe(channel)
             current_snapshot = NINServices().get_batch_status(job_id)
 
-            event_type = current_snapshot.pop("type", "status") if current_snapshot else "status"
-            if current_snapshot and (event_type == "done" or current_snapshot.get("status") == "done"):
+            event_type = (
+                current_snapshot.pop("type", "status") if current_snapshot else "status"
+            )
+            if current_snapshot and (
+                event_type == "done" or current_snapshot.get("status") == "done"
+            ):
                 yield f"event: complete\ndata: {json.dumps(current_snapshot)}\n\n"
                 return
 
@@ -95,12 +113,13 @@ def nin_progress_stream(job_id: str):
 def nin_status(job_id: str):
     payload = NINServices().get_batch_status(job_id)
     if not payload:
-        return jsonify({"success": False, "msg": "You didn't submit any job with this id"}), 404
-    return jsonify({
-        "success": True,
-        "msg": payload["status"],
-        "data": payload
-    })
+        return (
+            jsonify(
+                {"success": False, "msg": "You didn't submit any job with this id"}
+            ),
+            404,
+        )
+    return jsonify({"success": True, "msg": payload["status"], "data": payload})
 
 
 @nin_bp.get("/batch/<string:job_id>/download")
@@ -114,44 +133,59 @@ def download_nin_batch(job_id: str):
 
 @nin_bp.post("/batch/validate")
 def validate_nin_batch():
-    try: 
+    try:
         res = {
             "batch_file": request.files["batch_file"],
-            "generate_report": True if request.form.get("generate_report", "").lower() == "true" else False,
-            "aggregate_by_lga_ward": True if request.form.get("aggregate_by_lga_ward", "").lower() == "true" else False,
-            "aggregate_by_lga_facility": True if request.form.get("aggregate_by_lga_facility", "").lower() == "true" else False,
+            "generate_report": (
+                True
+                if request.form.get("generate_report", "").lower() == "true"
+                else False
+            ),
+            "aggregate_by_lga_ward": (
+                True
+                if request.form.get("aggregate_by_lga_ward", "").lower() == "true"
+                else False
+            ),
+            "aggregate_by_lga_facility": (
+                True
+                if request.form.get("aggregate_by_lga_facility", "").lower() == "true"
+                else False
+            ),
         }
         res = NINBatchValidator.model_validate(res)
     except ValidationError as e:
-        return jsonify(
-            {
-                "success": False,
-                "msg": serialize_validation_errors(e)
-            }
-        ), 400
+        return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
     except KeyError:
         return jsonify({"success": False, "msg": "batch_file is required"}), 400
 
     result = NINServices().start_batch_validation(res)
     if result.status == "duplicate":
-        return (jsonify({
-            "success": False,
-            "msg": result.msg,
-            "data": {
-                "job_url": url_for("nin_validation.nin_status", job_id=result.job_id)
-            }
-        }), 409)
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "msg": result.msg,
+                    "data": {
+                        "job_url": url_for(
+                            "nin_validation.nin_status", job_id=result.job_id
+                        )
+                    },
+                }
+            ),
+            409,
+        )
 
     if result.status == "save_error":
-        return (jsonify({
-            "success": False,
-            "msg": result.msg
-        }), 500)
+        return (jsonify({"success": False, "msg": result.msg}), 500)
 
-    return (jsonify({
-        "success": True,
-        "msg": result.msg,
-        "data": {
-            "job_url": url_for("nin_validation.nin_progress_stream", job_id=result.job_id)
+    return jsonify(
+        {
+            "success": True,
+            "msg": result.msg,
+            "data": {
+                "job_url": url_for(
+                    "nin_validation.nin_progress_stream", job_id=result.job_id
+                )
+            },
         }
-    }))
+    )
