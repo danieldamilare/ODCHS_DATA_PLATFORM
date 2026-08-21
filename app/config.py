@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
+
 
 class Config:
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024
@@ -27,9 +29,11 @@ class Config:
     NIN_ORIGIN = os.getenv("NIN_ORIGIN")
     SCRATCH_FILE_PATH = os.path.join(BASE_DIR, "temp")
     DIAGNOSIS_FILE_PATH = os.path.join(BASE_DIR, "diagnosis_list.txt")
-    EMAIL_SENDER = "ODCHS <no-reply@odchs.danieldamilare.dev>"
-    RESEND_API_KEY = os.getenv('RESEND_API_KEY')
-    FRONTEND_URL = "http://localhost:5173"
+    EMAIL_SENDER = (
+        os.getenv("EMAIL_SENDER") or "ODCHS <no-reply@odchs.danieldamilare.dev>"
+    )
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+    FRONTEND_URL = os.getenv("FRONTEND_URL") or "http://localhost:5173"
     JWT_COOKIE_CSRF_PROTECT = False
 
     SQLALCHEMY_ENGINE_OPTIONS = {
