@@ -638,7 +638,7 @@ function SheetVerification({ question, submitting, onSubmit }) {
                 ))}
             </div>
 
-            <PreviewTable rows={rows} maxRows={10} />
+            <PreviewTable rows={rows} maxRows={20} />
 
             <div className="flex items-center justify-end pt-1">
                 <button
@@ -677,13 +677,20 @@ function HeaderDisambiguation({ question, submitting, onSubmit }) {
         <QuestionShell
             icon={Table}
             title="Identify the header row and columns"
-            hint="Pick the row that holds the column names, then match each required column"
+            hint="Click on the row in the table below that contains your column titles, then map the 5 required fields."
         >
             <div>
-                <span className="block text-[11px] uppercase font-bold tracking-wider text-slate-400 mb-2">
-                    1 · Select the header row
-                </span>
-                <PreviewTable rows={rows} maxRows={12} selectable selected={headerRow} onSelect={setHeaderRow} />
+                <div className="flex items-center justify-between mb-2">
+                    <span className="block text-[11px] uppercase font-bold tracking-wider text-slate-400">
+                        1 · Select the header row
+                    </span>
+                    {headerRow != null && (
+                        <span className="text-[11px] font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
+                            Row {headerRow + 1} selected as header
+                        </span>
+                    )}
+                </div>
+                <PreviewTable rows={rows} maxRows={20} selectable selected={headerRow} onSelect={setHeaderRow} />
             </div>
 
             {headerRow != null && (
@@ -703,7 +710,7 @@ function HeaderDisambiguation({ question, submitting, onSubmit }) {
                                     <option value="">Select column…</option>
                                     {headerCells.map((cell, i) => (
                                         <option key={i} value={i}>
-                                            {cellText(cell) || `Column ${i + 1}`}
+                                            {cellText(cell) ? `Col ${i + 1}: ${cellText(cell)}` : `Col ${i + 1} (Empty)`}
                                         </option>
                                     ))}
                                 </select>
@@ -727,7 +734,7 @@ function HeaderDisambiguation({ question, submitting, onSubmit }) {
     );
 }
 
-function PreviewTable({ rows, maxRows = 10, selectable = false, selected = null, onSelect }) {
+function PreviewTable({ rows, maxRows = 20, selectable = false, selected = null, onSelect }) {
     const shown = rows.slice(0, maxRows);
     const colCount = shown.reduce((m, r) => Math.max(m, Array.isArray(r) ? r.length : 0), 0);
 
@@ -736,35 +743,69 @@ function PreviewTable({ rows, maxRows = 10, selectable = false, selected = null,
     }
 
     return (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 custom-scrollbar">
-            <table className="w-full text-left font-mono text-[11px] whitespace-nowrap">
-                <tbody className="divide-y divide-slate-100">
+        <div className="max-h-80 overflow-auto rounded-xl border border-slate-200 bg-white shadow-inner custom-scrollbar">
+            <table className="w-full border-collapse text-left font-mono text-[11px] whitespace-nowrap">
+                <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 shadow-xs">
+                    <tr>
+                        <th className="w-12 px-2.5 py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider border-r border-slate-200 bg-slate-100/90">
+                            #
+                        </th>
+                        {Array.from({ length: colCount }).map((_, c) => (
+                            <th
+                                key={c}
+                                className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200 bg-slate-50 min-w-[130px]"
+                            >
+                                Col {c + 1} ({String.fromCharCode(65 + (c % 26))})
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
                     {shown.map((row, r) => {
                         const isSel = selectable && selected === r;
                         return (
                             <tr
                                 key={r}
                                 onClick={() => selectable && onSelect?.(r)}
-                                className={`${
+                                className={`transition-colors ${
                                     selectable ? "cursor-pointer" : ""
-                                } transition-colors ${
-                                    isSel ? "bg-primary-50" : selectable ? "hover:bg-slate-50" : "odd:bg-white even:bg-slate-50/40"
+                                } ${
+                                    isSel
+                                        ? "bg-primary-50/90 font-medium text-primary-950"
+                                        : selectable
+                                        ? "hover:bg-slate-50/80 bg-white"
+                                        : "odd:bg-white even:bg-slate-50/50"
                                 }`}
                             >
-                                {selectable && (
-                                    <td className="px-2 py-1.5 border-r border-slate-100 align-middle">
-                                        <span
-                                            className={`flex items-center justify-center w-4 h-4 rounded-full border ${
-                                                isSel ? "border-primary-500 bg-primary-500" : "border-slate-300"
-                                            }`}
-                                        >
-                                            {isSel && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                        </span>
-                                    </td>
-                                )}
+                                <td
+                                    className={`px-2.5 py-2 text-center border-r border-slate-200 sticky left-0 z-[1] select-none ${
+                                        isSel ? "bg-primary-100/80 text-primary-700 font-bold" : "bg-slate-50 text-slate-400"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-center gap-1.5">
+                                        {selectable && (
+                                            <span
+                                                className={`flex items-center justify-center w-3.5 h-3.5 rounded-full border transition-all ${
+                                                    isSel
+                                                        ? "border-primary-600 bg-primary-600 text-white"
+                                                        : "border-slate-300 bg-white"
+                                                }`}
+                                            >
+                                                {isSel && <span className="w-1 h-1 rounded-full bg-white" />}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] font-mono">{r + 1}</span>
+                                    </div>
+                                </td>
                                 {Array.from({ length: colCount }).map((_, c) => (
-                                    <td key={c} className="px-2.5 py-1.5 text-slate-700 max-w-[160px] truncate">
-                                        {cellText(row?.[c])}
+                                    <td
+                                        key={c}
+                                        className={`px-3 py-2 border-r border-slate-200 max-w-[240px] truncate ${
+                                            isSel ? "text-primary-950 font-medium" : "text-slate-700"
+                                        }`}
+                                        title={cellText(row?.[c])}
+                                    >
+                                        {cellText(row?.[c]) || <span className="text-slate-300 italic">null</span>}
                                     </td>
                                 ))}
                             </tr>

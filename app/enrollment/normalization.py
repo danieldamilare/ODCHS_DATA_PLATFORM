@@ -125,9 +125,10 @@ def normalize_form_object(
     if not form.nin:
         flagged_reasons.append("No nin provided")
         form.nin_valid = False
-    elif len(form.nin) != 11:
-        flagged_reasons.append("Nin is not 11 digits")
+    elif not re.match(f"^\d{11}$", form.nin):
+        flagged_reasons.append("Nin is not 11 digits or contains non numeric character")
         form.nin_valid = False
+        form.nin = None
 
     phone_number = form.phone_number
     kin_phone_number = form.kin_phone_number
