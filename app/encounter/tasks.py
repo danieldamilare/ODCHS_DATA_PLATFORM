@@ -116,7 +116,15 @@ def get_start_state():
     return "sheet_verification"
 
 def _preview_rows(df: pd.DataFrame) -> list:
-    return [[None if pd.isna(v) else v for v in row] for row in df.values.tolist()]
+    return [
+        [
+            None if pd.isna(v) 
+            else v.isoformat() if hasattr(v, "isoformat") 
+            else v
+            for v in row
+        ]
+        for row in df.values.tolist()
+    ]
 
 def get_answer_url(job_idx: str, job_num: int):
     job_key=EncounterKeys.clean_id(job_idx)
@@ -159,7 +167,7 @@ def handle_sheet_verification(job_id):
         if not df.empty:
             sheet_value = _preview_rows(df)
             sheet_holder[0] = sheet_value
-            kv.hset(cache_path, str(0), json.dumps(sheet_value))
+            kv.hset(cache_path, str(0), json.dumps(sheet_value, default=str))
     else:
         engine = "odf" if ext == ".ods" else "calamine"
         file = pd.ExcelFile(path, engine=engine)
@@ -169,9 +177,10 @@ def handle_sheet_verification(job_id):
             if df.empty:
                 continue
             sheet_value = _preview_rows(df)
-            kv.hset(cache_path, str(sheet), json.dumps(sheet_value))
+            kv.hset(cache_path, str(sheet), json.dumps(sheet_value, default=str))
             sheet_holder[sheet] = sheet_value
 
+    
         if not sheet_holder:
             kv.publish(
                 channel,

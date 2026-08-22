@@ -46,3 +46,5 @@ authlib
 resend
 pyarrow
 Flask-JWT-Extended>=4.6.0
+psycogreen
+gevent
