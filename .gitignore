@@ -8,5 +8,6 @@ __pycache__/
 .idea/
 *.swp
 *.swo
-
+migrations/
+logs/
 *.db

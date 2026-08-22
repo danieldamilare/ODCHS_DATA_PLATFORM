@@ -88,6 +88,27 @@ class Config:
         },
     }
 
+    task_routes = {
+        "app.core.tasks.send_email": "io_bound",
+        "app.encounter.tasks.finalize_encounter_analysis": "cpu_bound",
+        "app.encounter.tasks.start_encounter_process": "cpu_bound",
+        "app.encounter.tasks.start_encounter_validation": "io_bound",
+        "app.encounter.tasks.start_encounter_analysis": "cpu_bound",
+        "app.enrollment.tasks.extract_zip_for_processing": "cpu_bound",
+        "app.enrollment.tasks.generate_id_card": "cpu_bound",
+        "app.enrollment.taks.get_his_id_card_payload": "io_bound",
+        "app.enrollment.tasks.reclaim_leased_api_keys": "io_bound",
+        "app.enrollment.tasks.start_id_card_generate_job": "io_bound",
+        "app.enrollment.tasks.process_image_pipeline": "io_bound",
+        "app.nin_validation.tasks.finalize_nin_process": "io_bound",
+        "app.nin_validation.tasks.generate_aggregate_breakdown": "cpu_bound",
+        "app.nin_validation.tasks.merge_csv_result": "io_bound",
+        "app.nin_validation.tasks.generate_pdf_report": "cpu_bound",
+        "app.nin_validation.tasks.process_nin_row": "io_bound",
+        "app.nin_validation.tasks.process_nin_batch_validation": "io_bound",
+        "app.nin_validation.tasks.update_final": "io_bound",
+    }
+
     @classmethod
     def init_app(cls):
         os.makedirs(cls.FORM_PATH, exist_ok=True)

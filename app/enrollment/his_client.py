@@ -85,9 +85,9 @@ class HISEnrolleeDetails:
             policy_number=item.get("enrolleeNo", ""),
             facility=item.get("providerName", ""),
             ward=item.get("ward", ""),
-            lga=item.get("city", ""),  # 'city' contains 'Akure South'
+            lga=item.get("city", ""),  
             surname=item.get("surname", ""),
-            firstname=item.get("middleName", "").strip(),  # Strip trailing whitespace
+            firstname=item.get("middleName", "").strip(),  
             othername=item.get("othername", ""),
             dob=cls._parse_dob(item.get("dob_MM_dd_yyyy")),
             gender=item.get("gender", ""),
@@ -116,7 +116,6 @@ class HISClient:
         endpoint: Optional[str] = None,
         param: Optional[Dict] = None,
         json_data: Optional[Dict] = None,
-        raw_data: Optional[str] = None,
     ) -> Dict[str, Any]:
 
         url = self.base_url
@@ -126,7 +125,7 @@ class HISClient:
             if json_data is not None:
                 res = self.session.post(url, json=json_data)
             else:
-                res = self.session.post(url, data=raw_data)
+                res = self.session.post(url, data=param)
         except requests.RequestException:
             raise IOError("Error communication to his site")
 

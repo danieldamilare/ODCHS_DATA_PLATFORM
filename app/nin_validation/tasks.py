@@ -38,7 +38,7 @@ def parse_dob_safely(dob_raw: str):
     return parser.parse(dob_raw)
 
 
-@celery_app.task(queue="io_bound")
+@celery_app.task(ignore_result=True)
 def process_nin_batch_validation(job_id: str):
     job_key = NINKeys.get_job_key(job_id)
     path = kv.hget(job_key, "path")
@@ -156,7 +156,7 @@ def process_inline(job_id: str, job_result: str, payload: dict):
     )
 
 
-@celery_app.task(bind=True, queue="io_bound", ignore_result=True)
+@celery_app.task(bind=True, ignore_result=True)
 def process_nin_row(self, job_id: str, worker_no: int):
     queue_path = NINKeys.get_job_queue(job_id)
     processing_queue_path = NINKeys.get_job_processing_queue(job_id, worker_no)
@@ -184,7 +184,7 @@ def _load_data(path):
     return df
 
 
-@celery_app.task(queue="cpu_bound")
+@celery_app.task
 def generate_aggregate_breakdown(path, job_id, aggregate_type):
     job_key = NINKeys.get_job_key(job_id)
     channel = NINKeys.get_job_channel(job_id)
@@ -244,7 +244,7 @@ def generate_aggregate_breakdown(path, job_id, aggregate_type):
             shutil.rmtree(parent_path)
 
 
-@celery_app.task(queue="io_bound")
+@celery_app.task
 def merge_csv_result(job_id: str, job_result: str) -> str:
     job_key = NINKeys.get_job_key(job_id)
     channel = NINKeys.get_job_channel(job_id)
@@ -298,7 +298,7 @@ def merge_csv_result(job_id: str, job_result: str) -> str:
     return new_path
 
 
-@celery_app.task(queue="cpu_bound")
+@celery_app.task
 def generate_pdf_report(data_path, job_id):
     job_key = NINKeys.get_job_key(job_id)
     channel = NINKeys.get_job_channel(job_id)
@@ -390,7 +390,7 @@ def generate_pdf_report(data_path, job_id):
     return data_path
 
 
-@celery_app.task(queue="io_bound")
+@celery_app.task(ignore_result=True)
 def update_final(job_id):
     job_key = NINKeys.get_job_key(job_id)
     channel = NINKeys.get_job_channel(job_id)
@@ -412,7 +412,7 @@ def update_final(job_id):
     )
 
 
-@celery_app.task(queue="io_bound", bind=True, max_retries=None)
+@celery_app.task(bind=True, max_retries=None, ignore_result=True)
 def finalize_nin_process(self, job_id: str):
     max_worker = MAX_WORKER
     job_result = NINKeys.get_result_key(job_id)

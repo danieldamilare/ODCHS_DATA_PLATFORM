@@ -122,7 +122,10 @@ def get_encounter_status(job_id):
     if not kv.exists(job_key):
         return {"success": False, "msg": "No encounter job exists with this id"}, 404
     result = kv.hgetall(job_key)
-    result["completed"] = res_len
+
+    if res_len:
+        result["completed"] = res_len
+
     result.pop("path", "")
     return jsonify({"success": True, "msg": "Loaded status", "data": result})
 

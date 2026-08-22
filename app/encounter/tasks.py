@@ -26,7 +26,7 @@ class NeedUserInput(Exception):
 ORANGHIS_ENCOUNTER_WORKFLOW_STATE = ["sheet_verification", "header_row_disambiguation"]
 ORANGHIS_REQUIRED_COLUMNS = {"age", "client name", "diagnosis", "sex", "policy number"}
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def start_encounter_process(job_id):
     job_key = EncounterKeys.get_job_key(job_id)
     path = str(kv.hget(job_key, "path") or "")
@@ -116,14 +116,6 @@ def get_start_state():
     return "sheet_verification"
 
 def _preview_rows(df: pd.DataFrame) -> list:
-    """DataFrame preview → JSON-safe nested list.
-
-    df.values.tolist() yields float('nan') for blank cells, and json.dumps
-    writes those as bare `NaN` tokens — accepted by Python's json but INVALID
-    JSON. The browser's JSON.parse rejects `NaN`, so both the live SSE payload
-    and the persisted pending_question snapshot fail to parse client-side.
-    Coerce NaN → None so every cell serializes as null.
-    """
     return [[None if pd.isna(v) else v for v in row] for row in df.values.tolist()]
 
 def get_answer_url(job_idx: str, job_num: int):
@@ -324,7 +316,7 @@ state_handler = {
 }
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def start_encounter_validation(job_id: str):
     job_key = EncounterKeys.get_job_key(job_id)
     channel = EncounterKeys.get_job_channel(job_id)
@@ -367,7 +359,7 @@ def _construct_path(job_id: str, job_num: Optional[int] = None, suffix: str = ""
     return os.path.join(path, prefix + f"{clean_id}_{job_num if job_num else ''}_{suffix}")
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def start_encounter_analysis(job_id, job_num):
     job_key = EncounterKeys.get_job_key(job_id)
     jobs = EncounterKeys.get_jobs_hash_key(job_id)
@@ -416,11 +408,6 @@ def start_encounter_analysis(job_id, job_num):
     kv.hset(EncounterKeys.get_results_key(job_id), str(job_num), json.dumps(entry))
 
     total = int(kv.hget(job_key, "total") or 0)
-    # hlen over the results hash is the self-healing source of truth for files done: no
-    # counter to sync, no double-count on redelivery. Read it, don't cache it back to
-    # job_key — a read-hlen-then-hset pair is a lost-update race under concurrent analysis
-    # tasks (a stale writer clobbers a higher count, pinning it below reality). The
-    # terminal count is persisted once, race-free, by the single-writer finalize below.
     completed = kv.hlen(EncounterKeys.get_results_key(job_id))
 
     publish_payload = {
@@ -442,7 +429,7 @@ def start_encounter_analysis(job_id, job_num):
     kv.delete(metadata_key)
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def finalize_encounter_analysis(job_id):
     job_key = EncounterKeys.get_job_key(job_id)
     result_queue = EncounterKeys.get_results_key(job_id)

@@ -34,7 +34,7 @@ from datetime import datetime
 from dataclasses import asdict
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def extract_zip_for_processing(path: str, batch_id: str):
     kv_batch_name = EnrollmentKeys.get_job_key(batch_id)
     channel = EnrollmentKeys.get_job_channel(batch_id)
@@ -181,7 +181,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
     db.session.commit()
 
 
-@celery_app.task(bind=True, max_retries=None)
+@celery_app.task(bind=True, max_retries=None, ignore_result=True)
 def process_image_pipeline(self, form_id: str, is_batch=True):
     form: Optional[Form] = db.session.scalar(
         sa.select(Form).where(Form.uuid == form_id)
@@ -222,7 +222,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
             _finalize_image_processing(batch_name, batch_id, active_form)
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def reclaim_leased_api_keys():
     from app.enrollment.llm.keys import KEY_POOL, LEASE, LEASE_TRACKER
     from hashlib import md5
@@ -266,7 +266,7 @@ def get_his_id_card_payload(path: str, enroll_no: str, batch_id: str):
     return (path, asdict(result)) if result and result.success else None
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def generate_id_card(result, batch_id):
     kv_batch_id_name = EnrollmentIdCardKeys.get_download_paths(batch_id)
     kv_batch_id_status = EnrollmentIdCardKeys.get_job_key(batch_id)
@@ -318,7 +318,7 @@ def generate_id_card(result, batch_id):
     kv.expire(kv_batch_id_status, 86400)
 
 
-@celery_app.task
+@celery_app.task(ignore_result=True)
 def start_id_card_generate_job(batch_id: str):
     batch = db.session.scalar(sa.select(Batch).where(Batch.uuid == batch_id))
     if not batch:
