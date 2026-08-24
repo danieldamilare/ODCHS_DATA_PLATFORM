@@ -111,6 +111,7 @@ class Form(db.Model):
     settlement = db.Column(db.String(5), nullable=True)
     category = db.Column(db.Integer, nullable=True)
     marital_status = db.Column(db.String(15), nullable=True)
+    occupation = db.Column(db.String, nullable=True)
 
     batch_id = db.Column(
         db.Integer, db.ForeignKey("batches.id"), nullable=False, index=True
@@ -188,6 +189,7 @@ class Form(db.Model):
             "gender": self.gender,
             "phone_number": self.phone_number,
             "nin": self.nin,
+            "occupation": self.occupation,
             "address": self.address,
             "category": self.category,
             "marital_status": self.marital_status,

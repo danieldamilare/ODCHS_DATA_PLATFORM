@@ -27,6 +27,23 @@ def compute_age(dob) -> int:
     return relativedelta.relativedelta(today, dob).years
 
 
+def normalize_category(category: Optional[str]) -> Optional[str]:
+    if not category:
+        return None
+    cat = str(category).lower().strip()
+
+    if "preg" in cat:
+        return "Pregnant women"
+    if "elder" in cat or "65" in cat:
+        return "Aged (65 Yrs above)"
+    if "child" in cat or "under 5" in cat:
+        return "Children Under 5 Years"
+    if "disab" in cat:
+        return "People with disabilities"
+    if "widow" in cat:
+        return "Widow/Widower"
+    return None
+
 def process_category(dob, gender: str, marital_status: str) -> str:
     age = compute_age(dob)
     is_female = (gender or "").strip().lower().startswith("f")
@@ -51,12 +68,12 @@ def process_title(gender: str, marital_status: str) -> str:
 def normalize_form_object(
     form: Form, batch: Dict, res: OCRResponse, coords: Dict
 ) -> Form:
-
     flagged_reasons = []
 
     form.nin = res.nin
     form.gender = res.gender
     form.address = res.address
+    form.occupation = res.occupation
     form.dob = res.dob
     form.phone_number = normalize_ng_phone(res.phone_number)
 
@@ -78,6 +95,7 @@ def normalize_form_object(
     title = process_title(
         form.gender, res.marital_status.value if res.marital_status else ""
     )
+
     form.title = title
 
     loader = get_loader()
@@ -89,11 +107,17 @@ def normalize_form_object(
         except (ValueError, OverflowError):
             flagged_reasons.append("Date Format is incorrect, and cannot be parsed")
 
-    category = None
+    category = normalize_category(res.category)
+    explicit_category = {"People with disabilities", 
+                         "Widow/Widower",
+                         "Pregnant women" }
+
     if dob:
-        category = process_category(
-            dob, form.gender, res.marital_status.value if res.marital_status else ""
-        )
+        if category not in explicit_category:
+            category = process_category(
+                dob, form.gender, res.marital_status.value if res.marital_status else ""
+            )
+    
         form.category = loader.citizen_types.get(category, None)
     else:
         flagged_reasons.append("No date of birth provided cannot determine category")

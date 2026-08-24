@@ -38,6 +38,8 @@ class OCRResponse(BaseModel):
     address: str = ""
     gender: Optional[Gender] = None
     phone_number: str = ""
+    category: str = ""
+    occupation: str = ""
     nin: str = ""
     next_of_kin: Optional[NextOfKin] = None
 

@@ -762,7 +762,7 @@ export default function FormReview() {
                     {/* Tab: Details — same scrollable column as desktop right pane */}
                     {mobileTab === "details" && (
                         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
-                            <div className="max-w-2xl mx-auto px-4 py-6 space-y-7">
+                            <div className="w-full px-4 py-6 space-y-7">
 
                                 {/* Status + flag signals */}
                                 <div className="space-y-3">
@@ -810,30 +810,31 @@ export default function FormReview() {
                         {/* ── Personal Information ── */}
                         <Section title="Personal Information">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                                {PERSONAL_FIELDS.map((f) => (
-                                    <div key={f.key} className={f.grid}>
-                                        <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
-                                            disabled={isLocked} required={REQUIRED.has(f.key)}
-                                            lgas={lgas} wards={wards} facilities={facilities} categories={categories}
-                                            error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
-                                        />
-                                    </div>
-                                ))}
+                                {PERSONAL_FIELDS.map((f) => {
+                                    const mismatch = ninMismatches?.find((m) => m.key === f.key);
+                                    return (
+                                        <div key={f.key} className={f.grid}>
+                                            <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
+                                                disabled={isLocked} required={REQUIRED.has(f.key)}
+                                                lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                                error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
+                                            />
+                                            {f.key === "nin" && (
+                                                <NinFieldFeedback
+                                                    nin={fields.nin} dob={fields.dob} status={ninStatus}
+                                                    verifying={ninVerifying} message={ninMessage}
+                                                    allMatched={ninStatus === "valid" && ninMismatches.length === 0}
+                                                    onRetry={reverifyNin}
+                                                />
+                                            )}
+                                            {ninStatus === "valid" && mismatch && (
+                                                <MismatchInlineFeedback mismatch={mismatch} onUse={updateField} disabled={isLocked} />
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </Section>
-
-                        {/* ── NIN verification ── */}
-                        <NinVerifyPanel
-                            nin={fields.nin}
-                            dob={fields.dob}
-                            status={ninStatus}
-                            verifying={ninVerifying}
-                            message={ninMessage}
-                            mismatches={ninMismatches}
-                            disabled={isLocked}
-                            onRetry={reverifyNin}
-                            onUse={updateField}
-                        />
 
                         {/* ── Location ── */}
                         <Section title="Location">
@@ -858,6 +859,21 @@ export default function FormReview() {
                                             disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
                                         />
+                                        {f.key === "kin_address" && (
+                                            <label className="flex items-center gap-2 mt-2 text-[11px] font-medium text-slate-500 cursor-pointer select-none">
+                                                <input 
+                                                    type="checkbox" 
+                                                    disabled={isLocked}
+                                                    checked={fields.kin_address === fields.address && !!fields.address}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) updateField("kin_address", fields.address || "");
+                                                        else updateField("kin_address", "");
+                                                    }}
+                                                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 w-3 h-3"
+                                                />
+                                                Same as enrollee address
+                                            </label>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -907,7 +923,7 @@ export default function FormReview() {
 
                 {/* ══ DESKTOP: right scrollable column (hidden below lg) ══ */}
                 <div className="max-lg:hidden flex-1 overflow-y-auto bg-white border-l border-slate-200/80 custom-scrollbar">
-                    <div className="max-w-2xl mx-auto px-6 py-6 space-y-7">
+                    <div className="w-full px-6 xl:px-12 py-6 space-y-7">
 
                         {/* Status + flag signals */}
                         <div className="space-y-3">
@@ -955,30 +971,31 @@ export default function FormReview() {
                         {/* ── Personal Information ── */}
                         <Section title="Personal Information">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                                {PERSONAL_FIELDS.map((f) => (
-                                    <div key={f.key} className={f.grid}>
-                                        <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
-                                            disabled={isLocked} required={REQUIRED.has(f.key)}
-                                            lgas={lgas} wards={wards} facilities={facilities} categories={categories}
-                                            error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
-                                        />
-                                    </div>
-                                ))}
+                                {PERSONAL_FIELDS.map((f) => {
+                                    const mismatch = ninMismatches?.find((m) => m.key === f.key);
+                                    return (
+                                        <div key={f.key} className={f.grid}>
+                                            <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
+                                                disabled={isLocked} required={REQUIRED.has(f.key)}
+                                                lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                                error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
+                                            />
+                                            {f.key === "nin" && (
+                                                <NinFieldFeedback
+                                                    nin={fields.nin} dob={fields.dob} status={ninStatus}
+                                                    verifying={ninVerifying} message={ninMessage}
+                                                    allMatched={ninStatus === "valid" && ninMismatches.length === 0}
+                                                    onRetry={reverifyNin}
+                                                />
+                                            )}
+                                            {ninStatus === "valid" && mismatch && (
+                                                <MismatchInlineFeedback mismatch={mismatch} onUse={updateField} disabled={isLocked} />
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </Section>
-
-                        {/* ── NIN verification ── */}
-                        <NinVerifyPanel
-                            nin={fields.nin}
-                            dob={fields.dob}
-                            status={ninStatus}
-                            verifying={ninVerifying}
-                            message={ninMessage}
-                            mismatches={ninMismatches}
-                            disabled={isLocked}
-                            onRetry={reverifyNin}
-                            onUse={updateField}
-                        />
 
                         {/* ── Location ── */}
                         <Section title="Location">
@@ -1003,6 +1020,21 @@ export default function FormReview() {
                                             disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
                                         />
+                                        {f.key === "kin_address" && (
+                                            <label className="flex items-center gap-2 mt-2 text-[11px] font-medium text-slate-500 cursor-pointer select-none">
+                                                <input 
+                                                    type="checkbox" 
+                                                    disabled={isLocked}
+                                                    checked={fields.kin_address === fields.address && !!fields.address}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) updateField("kin_address", fields.address || "");
+                                                        else updateField("kin_address", "");
+                                                    }}
+                                                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 w-3 h-3"
+                                                />
+                                                Same as enrollee address
+                                            </label>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -1251,81 +1283,76 @@ const NIN_PANEL_TONES = {
     idle: { border: "border-slate-200", bg: "bg-slate-50", icon: "text-slate-400", title: "text-slate-700" },
 };
 
-function NinVerifyPanel({ nin, dob, status, verifying, message, mismatches, disabled, onRetry, onUse }) {
+function NinFieldFeedback({ nin, dob, status, verifying, message, allMatched, onRetry }) {
     const eleven = /^\d{11}$/.test(nin || "");
-    if (!eleven) return null; // nothing to verify until the NIN is complete
+    if (!eleven) return null;
+    if (!dob) return (
+        <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1.5">
+            <AlertTriangle size={12} /> Enter date of birth to verify this NIN.
+        </p>
+    );
+    if (verifying) return (
+        <p className="mt-1.5 text-xs text-slate-500 flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin text-primary-500" /> Verifying NIN…
+        </p>
+    );
 
-    // 11-digit NIN but no DOB → the hook can't fire; nudge for the missing input.
-    if (!dob) {
+    if (status === "valid") {
         return (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center gap-2.5 text-sm text-slate-500">
-                <ShieldAlert size={16} className="text-slate-400 shrink-0" />
-                Enter date of birth to verify this NIN.
-            </div>
-        );
-    }
-
-    if (verifying) {
-        return (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center gap-2.5 text-sm text-slate-600">
-                <Loader2 size={16} className="animate-spin text-primary-500 shrink-0" />
-                Verifying NIN…
-            </div>
-        );
-    }
-
-    const tone = NIN_PANEL_TONES[status] || NIN_PANEL_TONES.idle;
-    const Icon = status === "valid" ? ShieldCheck : status === "error" ? AlertTriangle : ShieldAlert;
-    const heading = status === "valid" ? "NIN verified"
-        : status === "error" ? "Couldn't verify NIN"
-            : status === "invalid" ? "NIN could not be matched"
-                : "NIN not verified";
-
-    return (
-        <div className={`rounded-xl border ${tone.border} ${tone.bg} px-4 py-3.5 space-y-3`}>
-            <div className="flex items-center gap-2.5">
-                <Icon size={17} className={`${tone.icon} shrink-0`} />
-                <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold ${tone.title}`}>{heading}</p>
-                    {message && <p className="text-xs text-slate-500 mt-0.5">{message}</p>}
-                </div>
-                {status === "error" && (
-                    <button type="button" onClick={onRetry}
-                        className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors shrink-0">
-                        <RefreshCw size={12} /> Retry
-                    </button>
+            <div className="mt-1.5">
+                <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
+                    <ShieldCheck size={14} /> NIN verified
+                </p>
+                {allMatched && (
+                    <p className="text-[11px] text-emerald-600/80 mt-0.5">All details match NIN record.</p>
                 )}
             </div>
+        );
+    }
 
-            {status === "valid" && mismatches.length > 0 && (
-                <div className="space-y-2 pt-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                        {mismatches.length} field{mismatches.length !== 1 ? "s" : ""} differ from the NIN record
-                    </p>
-                    {mismatches.map((m) => (
-                        <div key={m.key} className="flex items-center gap-3 rounded-lg bg-white border border-slate-100 px-3 py-2">
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[11px] text-slate-400">{m.label}</p>
-                                <p className="text-sm truncate">
-                                    <span className="text-slate-400 line-through">{m.current}</span>
-                                    <span className="mx-1.5 text-slate-300">→</span>
-                                    <span className="font-semibold text-slate-800">{m.display}</span>
-                                </p>
-                            </div>
-                            <button type="button" disabled={disabled} onClick={() => onUse(m.key, m.apply)}
-                                className="rounded-lg bg-slate-800 text-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-900 disabled:opacity-40 transition-colors shrink-0">
-                                Use NIN value
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {status === "valid" && mismatches.length === 0 && (
-                <p className="text-xs text-emerald-600 flex items-center gap-1.5">
-                    <CheckCircle size={13} /> All personal details match the NIN record.
+    if (status === "invalid") {
+        return (
+            <div className="mt-1.5">
+                <p className="text-xs font-semibold text-red-600 flex items-center gap-1.5">
+                    <ShieldAlert size={14} /> NIN could not be matched
                 </p>
-            )}
+                {message && <p className="text-[11px] text-red-500 mt-0.5">{message}</p>}
+            </div>
+        );
+    }
+
+    if (status === "error") {
+        return (
+            <div className="mt-1.5 flex items-start justify-between gap-2">
+                <div>
+                    <p className="text-xs font-semibold text-amber-600 flex items-center gap-1.5">
+                        <AlertTriangle size={14} /> Couldn't verify NIN
+                    </p>
+                    {message && <p className="text-[11px] text-amber-600/80 mt-0.5">{message}</p>}
+                </div>
+                <button type="button" onClick={onRetry}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800 transition-colors">
+                    <RefreshCw size={10} /> Retry
+                </button>
+            </div>
+        );
+    }
+
+    return null;
+}
+
+function MismatchInlineFeedback({ mismatch, onUse, disabled }) {
+    if (!mismatch) return null;
+    return (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
+            <div className="flex-1 min-w-0">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-amber-600 mb-0.5">NIN Record Shows:</p>
+                <p className="text-xs font-semibold text-amber-900 truncate">{mismatch.display}</p>
+            </div>
+            <button type="button" disabled={disabled} onClick={() => onUse(mismatch.key, mismatch.apply)}
+                className="rounded text-white bg-amber-600 px-2.5 py-1 text-[10px] font-bold hover:bg-amber-700 disabled:opacity-40 transition-colors shrink-0">
+                Use this
+            </button>
         </div>
     );
 }
