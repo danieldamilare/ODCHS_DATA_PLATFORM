@@ -190,7 +190,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
     db.session.remove()
 
     t0 = perf_counter()
-    res = llm_extract(form.img_path)
+    res = llm_extract(new_img_path)
     print(f"gemini: {perf_counter() - t0:.3f}s")
 
     form = db.session.scalar(sa.select(Form).where(Form.uuid == form_uuid))
