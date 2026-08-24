@@ -49,7 +49,7 @@ def process_title(gender: str, marital_status: str) -> str:
 
 
 def normalize_form_object(
-    form: Form, batch: Batch, res: OCRResponse, coords: Dict
+    form: Form, batch: Dict, res: OCRResponse, coords: Dict
 ) -> Form:
 
     flagged_reasons = []
@@ -60,9 +60,9 @@ def normalize_form_object(
     form.dob = res.dob
     form.phone_number = normalize_ng_phone(res.phone_number)
 
-    form.lga_no = batch.lga_no
-    form.facility_no = batch.facility_no
-    form.ward_no = batch.ward_no
+    form.lga_no = batch['lga_no']
+    form.facility_no = batch['facility_no']
+    form.ward_no = batch['ward_no']
     form.surname = res.surname
     form.firstname = res.first_name
     form.othername = res.other_name

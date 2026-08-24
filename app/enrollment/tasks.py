@@ -177,16 +177,30 @@ def _process_image_pipeline(form: Form, batch: Batch):
         
     os.replace(path, new_img_path)
     form.img_path = new_img_path
+    form_uuid = form.uuid
+
+    batch_info = {
+        'lga_no': batch.lga_no,
+        'ward_no': batch.ward_no,
+        'facility_no': batch.facility_no
+    }
+
+    db.session.add(form)
+    db.session.commit()
+    db.session.remove()
 
     t0 = perf_counter()
     res = llm_extract(form.img_path)
     print(f"gemini: {perf_counter() - t0:.3f}s")
 
-    form = normalize_form_object(form, batch, res, coords)
+    form = db.session.scalar(sa.select(Form).where(Form.uuid == form_uuid))
+
+    form = normalize_form_object(form, batch_info, res, coords)
     form.status = FormStatus.READY
 
     db.session.add(form)
     db.session.commit()
+    return form
 
 
 @celery_app.task(bind=True, max_retries=None, ignore_result=True)
@@ -202,9 +216,9 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
     batch_name = EnrollmentKeys.get_job_key(batch_id)
 
     try:
-        _process_image_pipeline(form, batch)
+        processed_form = _process_image_pipeline(form, batch)
         if is_batch:
-            _finalize_image_processing(batch_name, batch_id, form)
+            _finalize_image_processing(batch_name, batch_id, processed_form)
 
     except AllKeysExhausted:
         traceback.print_exc()
