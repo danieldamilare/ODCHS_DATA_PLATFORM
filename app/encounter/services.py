@@ -14,6 +14,7 @@ from app.encounter.tasks import (
     ORANGHIS_ENCOUNTER_WORKFLOW_STATE,
     ORANGHIS_REQUIRED_COLUMNS,
     start_encounter_validation,
+    finalize_encounter_analysis,
 )
 
 
@@ -60,33 +61,68 @@ class EncounterServices:
 
         state = str(kv.hget(job_key, "state") or "")
         current_job = int(kv.hget(job_key, "current_job") or 0)
+        total_length = kv.hlen(EncounterKeys.get_jobs_hash_key(job_idx))
 
         if current_job != job_num:
-            return {"success": False, "msg": "This question is no longer active for this job"}
+            return {
+                "success": False,
+                "msg": "This question is no longer active for this job",
+            }
+        action = json_response.get("action")
+
+        if str(action).lower() == "skip":
+            kv.hset(job_key, "state", "done_validating")
+            kv.hset(
+                EncounterKeys.get_results_key(job_idx),
+                str(job_num),
+                json.dumps({"skipped": True}),
+            )
+
+            set_next_state(job_idx, "done_validating", run_analysis=False)
+
+            kv.hdel(job_key, "pending_question")
+            if kv.hlen(EncounterKeys.get_results_key(job_idx)) == total_length:
+                finalize_encounter_analysis.delay(job_idx)
+            else:
+                start_encounter_validation.delay(job_idx)
+            return {"success": True, "msg": "Successfully skipped sheet"}
 
         if state not in ORANGHIS_ENCOUNTER_WORKFLOW_STATE:
             return {"success": False, "msg": "No pending question for this job"}
 
         if state == "sheet_verification":
             if json_response.get("state") != "sheet_verification":
-                return {"success": False, "msg": "Mismatch in state, expected sheet_verification"}
+                return {
+                    "success": False,
+                    "msg": "Mismatch in state, expected sheet_verification",
+                }
             if not json_response.get("sheet_name"):
                 return {"success": False, "msg": "Missing sheet_name in response"}
             kv.hset(metadata_key, "sheet_name", str(json_response.get("sheet_name")))
         elif state == "header_row_disambiguation":
+
             if json_response.get("state") != "header_row_disambiguation":
-                return {"success": False, "msg": "Mismatch in state, expected header_row_disambiguation"}
+                return {
+                    "success": False,
+                    "msg": "Mismatch in state, expected header_row_disambiguation",
+                }
             required = ORANGHIS_REQUIRED_COLUMNS
             col_mapping = json_response.get("col")
             header_row = json_response.get("header_row")
 
             if not isinstance(col_mapping, dict) or set(col_mapping.keys()) != required:
-                return {"success": False, "msg": f"col must map exactly these keys: {sorted(required)}"}
+                return {
+                    "success": False,
+                    "msg": f"col must map exactly these keys: {sorted(required)}",
+                }
             if header_row is None:
                 return {"success": False, "msg": "header_row is required"}
 
-            kv.hset(metadata_key, mapping={"header_row": header_row, "col": json.dumps(col_mapping)})
-        set_next_state(job_key, state)
+            kv.hset(
+                metadata_key,
+                mapping={"header_row": header_row, "col": json.dumps(col_mapping)},
+            )
+        set_next_state(job_idx, state)
         kv.hdel(job_key, "pending_question")
-        start_encounter_validation.delay(job_key)
+        start_encounter_validation.delay(job_idx)
         return {"success": True, "msg": "Answer processed successfully"}

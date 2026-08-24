@@ -109,7 +109,6 @@ def start_encounter_process(job_id):
     )
     kv.hset(job_key, "current_job", "1")
     kv.hset(job_key, "status", "validating")
-    print("Starting encounter validation for files")
     start_encounter_validation.delay(job_id)
 
 def get_start_state():
@@ -131,7 +130,6 @@ def get_answer_url(job_idx: str, job_num: int):
     return f'/api/{job_key}/{job_num}/answer'
 
 def handle_sheet_verification(job_id):
-    print("In handle sheet verification")
     job_key = EncounterKeys.get_job_key(job_id)
     channel = EncounterKeys.get_job_channel(job_id)
     current_job = int(kv.hget(job_key, "current_job") or 0)
@@ -141,7 +139,6 @@ def handle_sheet_verification(job_id):
     metadata = EncounterKeys.get_metadata_key(job_id, current_job)
     path = str(kv.hget(jobs, job_idx) or "")
     job_key = EncounterKeys.get_job_key(job_id)
-    print(f"In handle sheet verification. Current job: {current_job}")
 
     kv.publish(
         channel,
@@ -242,7 +239,6 @@ def handle_row_disambiguation(job_id):
     jobs = EncounterKeys.get_jobs_hash_key(job_id)
 
     sheet = str(kv.hget(metadata, "sheet_name") or "")
-    print(kv.hget(cache_path, sheet))
     result = json.loads(str(kv.hget(cache_path, sheet) or ""))
     df = pd.DataFrame(result)
     needed = ORANGHIS_REQUIRED_COLUMNS
@@ -281,19 +277,22 @@ def handle_row_disambiguation(job_id):
     raise NeedUserInput(payload=json.dumps(payload))
 
 
-def set_next_state(job_id, state: str):
+def set_next_state(job_id, state: str, run_analysis=True):
     job_key = EncounterKeys.get_job_key(job_id)
     current_job = int(kv.hget(job_key, "current_job") or 0)
     cache_path = EncounterKeys.get_cache_key(job_id, current_job)
     jobs = EncounterKeys.get_jobs_hash_key(job_id)
     channel = EncounterKeys.get_job_channel(job_id)
     path = str(kv.hget(jobs, f"job:{current_job}") or "")
+    total_length = int(kv.hget(job_key, "total") or 0)
+    if current_job == total_length and state == "done_validating":
+        return
 
     states = {
         "sheet_verification": "header_row_disambiguation",
         "header_row_disambiguation": "done_validating",
     }
-    next_state = states[state]
+    next_state = states.get(state, state)
 
     if next_state == "done_validating":
         kv.publish(channel,  json.dumps({
@@ -306,14 +305,13 @@ def set_next_state(job_id, state: str):
             "message": "Validation complete, starting analysis",
 
         }))
-
-        start_encounter_analysis.delay(job_id, current_job)
+        if run_analysis:
+            start_encounter_analysis.delay(job_id, current_job)
         kv.delete(cache_path)  # only safe now — this file is fully validated
-        total_length = kv.hlen(jobs)
-        number = current_job
-        if number < total_length:
-            number += 1
-            kv.hset(job_key, "current_job", str(number))
+
+        if current_job < total_length:
+            current_job += 1
+            kv.hset(job_key, "current_job", str(current_job))
             next_state = get_start_state()
 
     kv.hset(EncounterKeys.get_job_key(job_id), "state", next_state)
@@ -329,12 +327,13 @@ state_handler = {
 def start_encounter_validation(job_id: str):
     job_key = EncounterKeys.get_job_key(job_id)
     channel = EncounterKeys.get_job_channel(job_id)
-    current_job = int(kv.hget(job_key, "current_job") or 0)
     jobs = EncounterKeys.get_jobs_hash_key(job_id)
+    current_job = int(kv.hget(job_key, "current_job") or 0)
     path = kv.hget(jobs, f"job:{current_job}")
 
     while True:
         state = str(kv.hget(job_key, "state") or "")
+        current_job = int(kv.hget(job_key, "current_job") or 0)
         if state == "done_validating":
             kv.hset(job_key, "status", "analysing")
 
@@ -354,7 +353,6 @@ def start_encounter_validation(job_id: str):
             handler = state_handler[state]
             handler(job_id)
         except NeedUserInput as e:
-            print("Need user input")
             kv.hset(job_key, "pending_question", e.payload)
             kv.publish(channel, e.payload)
             return
@@ -378,11 +376,9 @@ def start_encounter_analysis(job_id, job_num):
     metadata_key = EncounterKeys.get_metadata_key(job_id, job_num)
     metadata = kv.hgetall(metadata_key)
     if "header_row" not in metadata:
-        print("Skipping redelivered analysis for", job_item_key, "— metadata already consumed")
         return
     metadata["header_row"] = int(metadata["header_row"])
     metadata["col"] = json.loads(metadata["col"])
-    print("Start encounter analysis", path, metadata)
     total = int(kv.hget(job_key, "total") or 0)
     completed = int(kv.hget(job_key, "completed") or 0)
 
@@ -396,13 +392,11 @@ def start_encounter_analysis(job_id, job_num):
     }
 
     result = load_clean_dataframe(path, metadata)
-    print("loaded clean dataframe for ", path)
     facility, encounter_df, utilization_df = None, None, None
 
     if result.success:
         master_diagnosis_list = load_diagnosis_lines()
         facility, encounter_df, utilization_df = process_df(result.data, master_diagnosis_list)
-        print("We've processed df for", path)
         encounter_path = _construct_path(job_id, job_num, "encounter.parquet")
         utilization_path = _construct_path(job_id, job_num, "utilization.parquet")
         encounter_df.to_parquet(encounter_path)
@@ -462,7 +456,7 @@ def finalize_encounter_analysis(job_id):
 
     for entry in all_entries.values():
         data = json.loads(entry)
-        if data.get("failed"):
+        if data.get("failed") or data.get("skipped"):
             continue  
         encounters.append(pd.read_parquet(data["encounter_path"]))
         utilizations[data["facility"]] = pd.read_parquet(data["utilization_path"])
@@ -470,24 +464,22 @@ def finalize_encounter_analysis(job_id):
             os.unlink(data["encounter_path"])
         if os.path.exists(data["utilization_path"]):
             os.unlink(data["utilization_path"])
+    if encounters:
+        combined_encounter_report = pd.concat(encounters)
+        combined_encounter_report[("GRAND TOTAL", "Male")] = combined_encounter_report.loc[:, (slice(None), "Male")].sum(axis=1, min_count=1)
+        combined_encounter_report[("GRAND TOTAL", "Female")] = combined_encounter_report.loc[:, (slice(None), "Female")].sum(axis=1, min_count=1)
+        combined_encounter_report.loc["GRAND TOTAL(S)"] = combined_encounter_report.sum(min_count=1)
+        output_file_name = _construct_path(job_id=job_id, suffix="report.xlsx", prefix="encounter_utilization")
+        save_to_file(combined_encounter_report, utilizations, output_file_name)
+        updated_cache = serialize_from_redis_cache()
+        res = db.session.scalar(sa.select(DiagnosisCache).where(DiagnosisCache.key == "global"))
+        kv.hset(job_key, "report_path", output_file_name)
 
-    combined_encounter_report = pd.concat(encounters)
-    combined_encounter_report[("GRAND TOTAL", "Male")] = combined_encounter_report.loc[:, (slice(None), "Male")].sum(axis=1, min_count=1)
-    combined_encounter_report[("GRAND TOTAL", "Female")] = combined_encounter_report.loc[:, (slice(None), "Female")].sum(axis=1, min_count=1)
-    combined_encounter_report.loc["GRAND TOTAL(S)"] = combined_encounter_report.sum(min_count=1)
-    output_file_name = _construct_path(job_id=job_id, suffix="report.xlsx", prefix="encounter_utilization")
-    save_to_file(combined_encounter_report, utilizations, output_file_name)
-    updated_cache = serialize_from_redis_cache()
-    res = db.session.scalar(sa.select(DiagnosisCache).where(DiagnosisCache.key == "global"))
+        if res:
+            res.cache = updated_cache
+            db.session.commit()
 
-    if res:
-        res.cache = updated_cache
-        db.session.commit()
-
-    # finalize is the single writer (dispatched once via the hsetnx latch), so persisting
-    # completed=total here is race-free and gives a reloaded snapshot the correct
-    # "N of N processed" — the results hash it was derived from is deleted above.
-    kv.hset(job_key, mapping={"report_path": output_file_name, "status": "done", "completed": total})
+    kv.hset(job_key, mapping={"status": "done", "completed": total})
     kv.delete(EncounterKeys.get_jobs_hash_key(job_id))
 
     kv.publish(

@@ -31,15 +31,15 @@ export default function Enrollment() {
     }
 
     return (
-        <div className="p-8 space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between">
+        <div className="p-4 md:p-8 space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold gradient-text inline-block">Enrollment</h1>
                     <p className="text-sm text-slate-500 mt-1">Manage enrollment batches</p>
                 </div>
                 <button
                     onClick={() => setShowUpload(true)}
-                    className="flex items-center gap-2 gradient-primary rounded-xl text-white px-5 py-2.5 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all"
+                    className="flex items-center gap-2 gradient-primary rounded-xl text-white px-5 py-2.5 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all shrink-0"
                 >
                     <Plus size={16} />
                     Upload Batch
@@ -60,13 +60,13 @@ export default function Enrollment() {
                 ) : (
                     <>
                         <div className="overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full min-w-[480px]">
                                 <thead>
                                     <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100/80">
-                                        <th className="px-6 py-3.5 font-semibold">Batch</th>
-                                        <th className="px-6 py-3.5 font-semibold">Forms</th>
-                                        <th className="px-6 py-3.5 font-semibold">Status</th>
-                                        <th className="px-6 py-3.5 font-semibold">Uploaded</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">Batch</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">Forms</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">Status</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">Uploaded</th>
                                         <th className="px-6 py-3.5 w-10"></th>
                                     </tr>
                                 </thead>
@@ -77,14 +77,14 @@ export default function Enrollment() {
                                             onClick={() => navigate(`/enrollment/batches/${batch.id}`)}
                                             className="border-b border-slate-50 hover:bg-primary-50/30 cursor-pointer transition-colors group"
                                         >
-                                            <td className="px-6 py-4">
+                                            <td className="px-3 md:px-6 py-4">
                                                 <div className="font-mono text-sm text-slate-700 group-hover:text-primary-700 transition-colors">{batch.id.slice(0, 8)}</div>
                                                 <div className="text-xs text-slate-400 mt-0.5">
                                                     {batch.lga || batch.ward ? `${batch.lga || "—"} / ${batch.ward || "—"}` : "Location pending"}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm font-medium text-slate-600">{batch.total}</td>
-                                            <td className="px-6 py-4"><StatusBadge status={batch.status} /></td>
+                                            <td className="px-3 md:px-6 py-4"><StatusBadge status={batch.status} /></td>
                                             <td className="px-6 py-4 text-sm text-slate-500">
                                                 {batch.submitted_at ? new Date(batch.submitted_at).toLocaleDateString() : "—"}
                                             </td>

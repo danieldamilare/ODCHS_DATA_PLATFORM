@@ -165,10 +165,18 @@ def _process_image_pipeline(form: Form, batch: Batch):
     correct_form, coords = process_form_orientation_and_crop(image_matrix)
     print(f"yunet crop and orientation correction: {perf_counter() - t0:.3f}s")
 
-    desc, path = tempfile.mkstemp(suffix=os.path.splitext(form.img_path)[1])
+    desc, path = tempfile.mkstemp(suffix=".webp")
     os.close(desc)
-    cv2.imwrite(path, correct_form)
-    os.replace(path, form.img_path)
+    cv2.imwrite(path, correct_form, [cv2.IMWRITE_WEBP_QUALITY, 75])
+    
+    base, _ = os.path.splitext(form.img_path)
+    new_img_path = base + ".webp"
+    
+    if form.img_path != new_img_path and os.path.exists(form.img_path):
+        os.remove(form.img_path)
+        
+    os.replace(path, new_img_path)
+    form.img_path = new_img_path
 
     t0 = perf_counter()
     res = llm_extract(form.img_path)

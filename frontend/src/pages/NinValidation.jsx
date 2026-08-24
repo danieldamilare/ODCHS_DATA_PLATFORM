@@ -47,7 +47,7 @@ export default function NinValidation() {
     }
 
     return (
-        <div className="p-8 space-y-6 animate-fade-in">
+        <div className="p-4 md:p-8 space-y-6 animate-fade-in">
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold gradient-text inline-block">NIN Validation</h1>
@@ -129,7 +129,7 @@ function SingleCheck() {
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-5xl">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Lookup Form */}
             <div className="lg:col-span-5 card p-6 space-y-5">
                 <div>
@@ -483,7 +483,7 @@ function BatchValidation({ routeJobId }) {
     const submitting = phase === "submitting";
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Column (60%) - Upload & Settings */}
             <div className="lg:col-span-7 space-y-5">
                 {/* Upload Card */}

@@ -28,7 +28,7 @@ export default function Dashboard() {
     const counts = { total, processing, done };
 
     return (
-        <div className="p-8 space-y-8 animate-fade-in">
+        <div className="p-4 md:p-8 space-y-8 animate-fade-in">
             <div>
                 <h1 className="text-2xl font-bold gradient-text inline-block">Dashboard</h1>
                 <p className="text-sm text-slate-500 mt-1">Overview of enrollment activity</p>
@@ -75,13 +75,14 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-400 mt-1">Upload your first batch to get started</p>
                     </div>
                 ) : (
-                    <table className="w-full">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[480px]">
                         <thead>
                             <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100/80">
-                                <th className="px-6 py-3 font-semibold">Batch</th>
-                                <th className="px-6 py-3 font-semibold">Forms</th>
-                                <th className="px-6 py-3 font-semibold">Status</th>
-                                <th className="px-6 py-3 font-semibold">Uploaded</th>
+                                <th className="px-3 md:px-6 py-3 font-semibold">Batch</th>
+                                <th className="px-3 md:px-6 py-3 font-semibold">Forms</th>
+                                <th className="px-3 md:px-6 py-3 font-semibold">Status</th>
+                                <th className="px-3 md:px-6 py-3 font-semibold">Uploaded</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -91,14 +92,14 @@ export default function Dashboard() {
                                     onClick={() => navigate(`/enrollment/batches/${batch.id}`)}
                                     className="border-b border-slate-50 hover:bg-primary-50/30 cursor-pointer transition-colors group"
                                 >
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 md:px-6 py-4">
                                         <div className="font-mono text-sm text-slate-700 group-hover:text-primary-700 transition-colors">{batch.id.slice(0, 8)}</div>
                                         <div className="text-xs text-slate-400 mt-0.5">
                                             {batch.lga || batch.ward ? `${batch.lga || "—"} / ${batch.ward || "—"}` : "Location pending"}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm font-medium text-slate-600">{batch.total}</td>
-                                    <td className="px-6 py-4"><StatusBadge status={batch.status} /></td>
+                                    <td className="px-3 md:px-6 py-4"><StatusBadge status={batch.status} /></td>
                                     <td className="px-6 py-4 text-sm text-slate-500">
                                         {batch.submitted_at ? new Date(batch.submitted_at).toLocaleDateString() : "—"}
                                     </td>
@@ -106,6 +107,7 @@ export default function Dashboard() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
         </div>

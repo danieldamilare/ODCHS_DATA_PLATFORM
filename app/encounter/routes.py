@@ -90,7 +90,6 @@ def encounter_progress(job_id):
                     continue
                 if message["type"] == "message":
                     payload = dict(json.loads(message["data"]))
-                    print(payload)
                     event_type = payload.pop("type", "status")
 
                     if event_type == "done":
@@ -133,8 +132,14 @@ def get_encounter_status(job_id):
 @encounter_bp.get("/<string:job_idx>/download")
 def download_encounter(job_idx):
     job_key = EncounterKeys.get_job_key(job_idx)
-    result_path = kv.hget(job_key, "report_path") or ""
-    return send_file(
-        result_path,
-        as_attachment=True,
-    )
+    result_path = kv.hget(job_key, "report_path")
+    if result_path:
+        return send_file(
+            result_path,
+            as_attachment=True,
+        )
+    else:
+        return jsonify({
+            "success": False,
+            "msg": "There is no download file for this encounter. This is usually because there is no encounter report generated or encounter analysis is not complete yet."
+        }), 400

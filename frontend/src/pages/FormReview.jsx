@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getForm, updateForm, uploadPassport, rejectForm, enrollForm, getLGAs, getWards, getFacilities, getBatchForms, getCategories } from "../api/enrollment";
 import { useToast } from "../components/ui/Toast";
@@ -10,7 +10,7 @@ import FormActions from "../components/enrollment/FormActions";
 import { canEdit } from "../constants/formStatus";
 import useNinVerification from "../hooks/useNinVerification";
 import { warmNin } from "../api/nin";
-import { ArrowLeft, Upload, Crop, User, Loader2, CheckCircle, AlertTriangle, XCircle, Timer, Trophy, X, BarChart3, RefreshCw, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Upload, Crop, User, Loader2, CheckCircle, AlertTriangle, XCircle, Timer, Trophy, X, BarChart3, RefreshCw, ShieldCheck, ShieldAlert, ScanLine, ClipboardList } from "lucide-react";
 
 /* ── Required fields (mirrors backend FormUpdater) ── */
 const REQUIRED = new Set([
@@ -64,6 +64,11 @@ const KIN_FIELDS = [
 
 const PREFETCH_COUNT = 5;
 
+// Session-scoped caches for ward and facility lookups.
+// Module-level so they persist across form navigations without needing state or context.
+const _wardCache = new Map();
+const _facilityCache = new Map();
+
 export default function FormReview() {
     const { formId: routeFormId, batchId } = useParams();
     const navigate = useNavigate();
@@ -113,6 +118,10 @@ export default function FormReview() {
     const [showReject, setShowReject] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
     const [rejecting, setRejecting] = useState(false);
+
+    // Mobile tab — "form" shows the scanned image, "details" shows the fields.
+    // Only applies below the lg breakpoint; desktop ignores this entirely.
+    const [mobileTab, setMobileTab] = useState("form");
 
     // NIN verification override gate (enroll confirm shown whenever NIN isn't "valid")
     const [showNinConfirm, setShowNinConfirm] = useState(false);
@@ -183,13 +192,18 @@ export default function FormReview() {
     }, [isReviewMode, reviewComplete, cancelled, sessionStart]);
 
     // ═══════════════ Image preloading ═══════════════
+    // We use fetch() instead of new Image() deliberately: the main blob download
+    // (fetch → blob → createObjectURL) uses credentials + CSRF headers, which
+    // creates a different HTTP cache entry than a plain <img src> preload.
+    // Using fetch() here means the prefetch and the actual blob download share
+    // the same cache entry — so the next form's image is already in cache.
 
     useEffect(() => {
         if (!queue || queue.length === 0) return;
         queue.forEach((qf, i) => {
             if (i > queueIndex && i <= queueIndex + 3) {
-                if (qf.img_path) { const img = new Image(); img.src = qf.img_path; }
-                if (qf.passport_path) { const img = new Image(); img.src = qf.passport_path; }
+                if (qf.img_path) fetch(qf.img_path, { credentials: "include" }).catch(() => {});
+                if (qf.passport_path) fetch(qf.passport_path, { credentials: "include" }).catch(() => {});
             }
         });
     }, [queue, queueIndex]);
@@ -236,6 +250,7 @@ export default function FormReview() {
         if (rotatedImgUrlRef.current) URL.revokeObjectURL(rotatedImgUrlRef.current);
         setRotatedImgUrl(null);
         rotatedImgUrlRef.current = null;
+        setMobileTab("form"); // always land on the image when a new form loads
     }
 
     // Cache form image as blob URL for reuse (crop modal, left pane)
@@ -302,6 +317,8 @@ export default function FormReview() {
     }
 
     // ═══════════════ Cascading data ═══════════════
+    // Wards and facilities are cached in module-level Maps so navigating between
+    // forms that share the same LGA does not fire redundant network requests.
 
     useEffect(() => {
         getLGAs().then((r) => setLgas(Array.isArray(r) ? r : r.data || [])).catch(() => {});
@@ -310,12 +327,24 @@ export default function FormReview() {
 
     useEffect(() => {
         if (!fields.lga_no) { setWards([]); setFacilities([]); return; }
-        getWards(fields.lga_no).then((r) => setWards(Array.isArray(r) ? r : r.data || [])).catch(() => {});
+        const cached = _wardCache.get(String(fields.lga_no));
+        if (cached) { setWards(cached); return; }
+        getWards(fields.lga_no).then((r) => {
+            const data = Array.isArray(r) ? r : r.data || [];
+            _wardCache.set(String(fields.lga_no), data);
+            setWards(data);
+        }).catch(() => {});
     }, [fields.lga_no]);
 
     useEffect(() => {
         if (!fields.ward_no) { setFacilities([]); return; }
-        getFacilities(fields.ward_no).then((r) => setFacilities(Array.isArray(r) ? r : r.data || [])).catch(() => {});
+        const cached = _facilityCache.get(String(fields.ward_no));
+        if (cached) { setFacilities(cached); return; }
+        getFacilities(fields.ward_no).then((r) => {
+            const data = Array.isArray(r) ? r : r.data || [];
+            _facilityCache.set(String(fields.ward_no), data);
+            setFacilities(data);
+        }).catch(() => {});
     }, [fields.ward_no]);
 
     // ═══════════════ Live NIN verification ═══════════════
@@ -535,6 +564,13 @@ export default function FormReview() {
         } finally { setRejecting(false); }
     }
 
+    // Memoize passport file blob URL — must be here (before early returns) to
+    // satisfy Rules of Hooks. useMemo cannot be called after a conditional return.
+    const passportFileSrc = useMemo(
+        () => (passportFile ? URL.createObjectURL(passportFile) : null),
+        [passportFile]
+    );
+
     // ═══════════════ Render: Session summary (complete or cancelled) ═══════════════
 
     if (reviewComplete || cancelled) {
@@ -591,9 +627,16 @@ export default function FormReview() {
     }
 
     const isLocked = !canEdit(form.status);
-    const displaySrc = rotation !== 0 ? (rotatedImgUrl || cachedImgUrl) : (cachedImgUrl || form.img_path);
-    const passportSrc = passportFile
-        ? URL.createObjectURL(passportFile)
+
+    // Show the raw URL immediately so the viewer paints without waiting for the blob.
+    // cachedImgUrl (the blob) is used when available — the CropModal requires it for
+    // canvas drawing; the viewer just needs any paintable src, raw URL is fine.
+    const displaySrc = rotation !== 0
+        ? (rotatedImgUrl || cachedImgUrl || form.img_path)
+        : (cachedImgUrl || form.img_path);
+
+    const passportSrc = passportFileSrc
+        ? passportFileSrc
         : useAvatar
             ? (fields.gender?.toLowerCase() === "male" ? form.MALE_AVATAR : form.FEMALE_AVATAR)
             : form.passport_path || croppedPreview || null;
@@ -657,9 +700,10 @@ export default function FormReview() {
                 </div>
             </div>
 
-            {/* ── Two-column layout ── */}
+            {/* ── Layout ── */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Left: scanned image */}
+
+                {/* ══ DESKTOP: left image pane (hidden below lg) ══ */}
                 <div className="w-1/2 bg-slate-900 shrink-0 max-lg:hidden">
                     {displaySrc ? (
                         <ImageViewer key={displaySrc} src={displaySrc} onRotate={!isLocked ? handleRotate : undefined} />
@@ -670,17 +714,200 @@ export default function FormReview() {
                     )}
                 </div>
 
-                {/* Right: fields */}
-                <div className="flex-1 overflow-y-auto bg-white border-l border-slate-200/80 custom-scrollbar">
-                    <div className="max-w-2xl mx-auto px-6 py-6 space-y-7">
+                {/* ══ MOBILE: tab bar + tab panels (hidden on lg+) ══ */}
+                <div className="lg:hidden flex flex-col flex-1 overflow-hidden">
+                    {/* Tab bar */}
+                    <div className="shrink-0 flex border-b border-slate-200 bg-white">
+                        <button
+                            onClick={() => setMobileTab("form")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-semibold border-b-2 transition-colors ${
+                                mobileTab === "form"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-slate-400 hover:text-slate-600"
+                            }`}
+                        >
+                            <ScanLine size={15} />
+                            Form Image
+                        </button>
+                        <button
+                            onClick={() => setMobileTab("details")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-semibold border-b-2 transition-colors relative ${
+                                mobileTab === "details"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-slate-400 hover:text-slate-600"
+                            }`}
+                        >
+                            <ClipboardList size={15} />
+                            Details
+                            {/* Warning dot — shows if the form has any flags */}
+                            {(form.flags?.length > 0 || form.nin_status === "mismatch") && (
+                                <span className="absolute top-2.5 right-[calc(50%-28px)] w-2 h-2 rounded-full bg-amber-400" />
+                            )}
+                        </button>
+                    </div>
 
-                        {/* Mobile image */}
-                        <div className="lg:hidden rounded-xl overflow-hidden bg-slate-900 max-h-56 flex items-center justify-center">
-                            {displaySrc
-                                ? <img src={displaySrc} alt="Scanned form" className="max-w-full max-h-56 object-contain" />
-                                : <p className="text-slate-600 py-10">No scan available</p>
-                            }
+                    {/* Tab: Form Image — full-height ImageViewer */}
+                    {mobileTab === "form" && (
+                        <div className="flex-1 bg-slate-900 overflow-hidden">
+                            {displaySrc ? (
+                                <ImageViewer key={displaySrc} src={displaySrc} onRotate={!isLocked ? handleRotate : undefined} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <p className="text-slate-500">No scan available</p>
+                                </div>
+                            )}
                         </div>
+                    )}
+
+                    {/* Tab: Details — same scrollable column as desktop right pane */}
+                    {mobileTab === "details" && (
+                        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+                            <div className="max-w-2xl mx-auto px-4 py-6 space-y-7">
+
+                                {/* Status + flag signals */}
+                                <div className="space-y-3">
+                                    <StatusBanner form={form} />
+                                    <FlagCallout form={form} />
+                                </div>
+
+                        {/* ── Passport box ── */}
+                        <div className="card p-6">
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Passport Photo</p>
+                            <div className="flex flex-col items-center">
+                                <div className="w-32 h-40 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                                    {passportSrc
+                                        ? <img src={passportSrc} alt="Passport" className="w-full h-full object-cover rounded-lg" />
+                                        : <User size={44} className="text-slate-300" />
+                                    }
+                                </div>
+                                <div className="flex gap-3 mt-4">
+                                    <input ref={passportRef} type="file" accept="image/*" className="hidden"
+                                        onChange={(e) => { if (e.target.files[0]) { setPassportFile(e.target.files[0]); setUseAvatar(false); } }}
+                                    />
+                                    <button type="button" onClick={() => passportRef.current.click()} disabled={isLocked}
+                                        className="gradient-primary text-white rounded-xl px-5 py-2 text-xs font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all disabled:opacity-40 flex items-center gap-1.5">
+                                        <Upload size={13} /> Upload
+                                    </button>
+                                    <button type="button" disabled={isLocked || !cachedImgUrl}
+                                        title={!cachedImgUrl ? "Loading image, please wait…" : "Crop passport photo"}
+                                        onClick={() => {
+                                            if (rotation !== 0 && !rotatedImgUrl) { toast.warn("Preparing rotated image, try again in a moment"); return; }
+                                            setShowCropModal(true);
+                                        }}
+                                        className="bg-slate-100 text-slate-700 rounded-xl px-5 py-2 text-xs font-semibold hover:bg-slate-200 transition-all disabled:opacity-40 flex items-center gap-1.5 border border-slate-200">
+                                        <Crop size={13} /> Recrop
+                                    </button>
+                                </div>
+                                <label className="flex items-center gap-2 text-xs text-slate-500 mt-3 cursor-pointer select-none">
+                                    <input type="checkbox" checked={useAvatar} disabled={isLocked}
+                                        onChange={(e) => { setUseAvatar(e.target.checked); if (e.target.checked) setPassportFile(null); }}
+                                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                                    Use default avatar
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* ── Personal Information ── */}
+                        <Section title="Personal Information">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                                {PERSONAL_FIELDS.map((f) => (
+                                    <div key={f.key} className={f.grid}>
+                                        <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
+                                            disabled={isLocked} required={REQUIRED.has(f.key)}
+                                            lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                            error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </Section>
+
+                        {/* ── NIN verification ── */}
+                        <NinVerifyPanel
+                            nin={fields.nin}
+                            dob={fields.dob}
+                            status={ninStatus}
+                            verifying={ninVerifying}
+                            message={ninMessage}
+                            mismatches={ninMismatches}
+                            disabled={isLocked}
+                            onRetry={reverifyNin}
+                            onUse={updateField}
+                        />
+
+                        {/* ── Location ── */}
+                        <Section title="Location">
+                            <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                                {LOCATION_FIELDS.map((f) => (
+                                    <div key={f.key} className={f.grid}>
+                                        <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
+                                            disabled={isLocked} required={REQUIRED.has(f.key)}
+                                            lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </Section>
+
+                        {/* ── Next of Kin ── */}
+                        <Section title="Next of Kin">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                                {KIN_FIELDS.map((f) => (
+                                    <div key={f.key} className={f.grid}>
+                                        <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
+                                            disabled={isLocked} required={REQUIRED.has(f.key)}
+                                            lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </Section>
+
+                        {/* ── Actions ── */}
+                        {!isLocked && (
+                            <div className="sticky bottom-0 bg-white pt-4 pb-6 space-y-4" style={{ boxShadow: "0 -4px 16px rgba(0,0,0,0.04)" }}>
+                                <div className="flex gap-3">
+                                    {!showReject ? (
+                                        <button onClick={() => setShowReject(true)}
+                                            className="flex-1 rounded-xl border-2 border-red-200 text-red-600 py-3 text-sm font-semibold hover:bg-red-50 hover:border-red-300 transition-all">
+                                            Reject
+                                        </button>
+                                    ) : (
+                                        <div className="flex-1 space-y-3 p-4 bg-red-50 rounded-xl border border-red-100 animate-scale-in">
+                                            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
+                                                placeholder="Reason for rejection..." rows={2}
+                                                className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm resize-none input-focus" />
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setShowReject(false)} className="flex-1 rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-white font-medium">Cancel</button>
+                                                <button onClick={handleReject} disabled={rejecting}
+                                                    className="flex-1 rounded-xl bg-red-600 text-white py-2 text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors">
+                                                    {rejecting ? "..." : "Confirm Reject"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button onClick={handleEnroll} disabled={enrolling}
+                                        className="flex-1 gradient-primary rounded-xl text-white py-3 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                                        {enrolling && <Loader2 size={14} className="animate-spin" />}
+                                        {enrolling ? "Enrolling..." : "Enroll"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {isLocked && !isReviewMode && form.enrollee_number && (
+                            <div className="text-center py-6 border-t border-slate-100">
+                                <p className="font-mono text-xs text-primary-600">Enrollee ID: {form.enrollee_number}</p>
+                            </div>
+                        )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ══ DESKTOP: right scrollable column (hidden below lg) ══ */}
+                <div className="max-lg:hidden flex-1 overflow-y-auto bg-white border-l border-slate-200/80 custom-scrollbar">
+                    <div className="max-w-2xl mx-auto px-6 py-6 space-y-7">
 
                         {/* Status + flag signals */}
                         <div className="space-y-3">
@@ -706,7 +933,8 @@ export default function FormReview() {
                                         className="gradient-primary text-white rounded-xl px-5 py-2 text-xs font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all disabled:opacity-40 flex items-center gap-1.5">
                                         <Upload size={13} /> Upload
                                     </button>
-                                    <button type="button" disabled={isLocked}
+                                    <button type="button" disabled={isLocked || !cachedImgUrl}
+                                        title={!cachedImgUrl ? "Loading image, please wait…" : "Crop passport photo"}
                                         onClick={() => {
                                             if (rotation !== 0 && !rotatedImgUrl) { toast.warn("Preparing rotated image, try again in a moment"); return; }
                                             setShowCropModal(true);
@@ -819,6 +1047,7 @@ export default function FormReview() {
                         )}
                     </div>
                 </div>
+
             </div>
 
             {showCropModal && (

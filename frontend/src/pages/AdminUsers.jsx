@@ -115,7 +115,7 @@ export default function AdminUsers() {
     }
 
     return (
-        <div className="p-8 space-y-6 animate-fade-in">
+        <div className="p-4 md:p-8 space-y-6 animate-fade-in">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -175,11 +175,11 @@ export default function AdminUsers() {
                             <table className="w-full">
                                 <thead>
                                     <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100/80">
-                                        <th className="px-6 py-3.5 font-semibold">User</th>
-                                        <th className="px-6 py-3.5 font-semibold">Role</th>
-                                        <th className="px-6 py-3.5 font-semibold">Status</th>
-                                        <th className="px-6 py-3.5 font-semibold">Expires</th>
-                                        <th className="px-6 py-3.5 text-right font-semibold">Actions</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">User</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">Role</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold">Status</th>
+                                        <th className="px-3 md:px-6 py-3.5 font-semibold hidden sm:table-cell">Expires</th>
+                                        <th className="px-3 md:px-6 py-3.5 text-right font-semibold">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -275,7 +275,7 @@ function UserRow({ user, isLastRow, onResend, onCancel, onDeactivate, onReactiva
     return (
         <tr className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
             {/* User Info */}
-            <td className="px-6 py-4">
+            <td className="px-3 md:px-6 py-4">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center shrink-0">
                         {initials}
@@ -290,7 +290,7 @@ function UserRow({ user, isLastRow, onResend, onCancel, onDeactivate, onReactiva
             </td>
 
             {/* Role */}
-            <td className="px-6 py-4">
+            <td className="px-3 md:px-6 py-4">
                 <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         user.role === "admin"
@@ -304,12 +304,12 @@ function UserRow({ user, isLastRow, onResend, onCancel, onDeactivate, onReactiva
             </td>
 
             {/* Status */}
-            <td className="px-6 py-4">
+            <td className="px-3 md:px-6 py-4">
                 <StatusBadge status={statusToDisplay} />
             </td>
 
-            {/* Expiry */}
-            <td className="px-6 py-4 text-xs font-medium">
+            {/* Expiry — hidden on mobile, shown sm+ (matches the header) */}
+            <td className="px-3 md:px-6 py-4 text-xs font-medium hidden sm:table-cell">
                 {user.expiry_date ? (
                     <span className={isExpired ? "text-rose-600 font-semibold" : "text-slate-600"}>
                         {new Date(user.expiry_date).toLocaleDateString(undefined, {
@@ -325,7 +325,7 @@ function UserRow({ user, isLastRow, onResend, onCancel, onDeactivate, onReactiva
             </td>
 
             {/* Actions Menu */}
-            <td className="px-6 py-4 text-right relative">
+            <td className="px-3 md:px-6 py-4 text-right relative">
                 <div className="inline-block text-left" ref={menuRef}>
                     <button
                         onClick={() => setMenuOpen(!menuOpen)}

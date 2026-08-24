@@ -91,15 +91,18 @@ def parse_age_from_string(age_val):
         return np.nan
     age_str = str(age_val).upper()
     numbers = re.findall(r"\d+\.?\d*", age_str)
-    if not numbers:
+    try:
+        if not numbers:
+            return np.nan
+        age_num = float(numbers[0])
+        if "MTH" in age_str or "MONTH" in age_str:
+            return age_num / 12
+        elif "DAY" in age_str:
+            return age_num / 365
+        else:
+            return age_num
+    except (ValueError, OverflowError):
         return np.nan
-    age_num = float(numbers[0])
-    if "MTH" in age_str or "MONTH" in age_str:
-        return age_num / 12
-    elif "DAY" in age_str:
-        return age_num / 365
-    else:
-        return age_num
 
 
 def categorize_age(age_val) -> Optional[str]:
@@ -123,11 +126,13 @@ def categorize_age(age_val) -> Optional[str]:
 def load_clean_dataframe(file_path: str, metadata: Dict):
     try:
         facility_name = os.path.splitext(os.path.basename(file_path))[0]
+
         df = read_into_df(
             file_path=file_path,
             sheet_name=metadata["sheet_name"],
             header=int(metadata["header_row"]),
         )
+
         df.dropna(axis=0, how="all", inplace=True)
         columns = list(df.columns)
 
@@ -327,4 +332,3 @@ def save_to_file(
 
     except Exception as e:
         print(f"Critical Error during file save: {e}")
-

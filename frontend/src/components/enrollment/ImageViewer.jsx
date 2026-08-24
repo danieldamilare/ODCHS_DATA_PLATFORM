@@ -87,7 +87,7 @@ export default function ImageViewer({ src, onRotate, rotateDisabled }) {
         };
         el.addEventListener("wheel", onWheel, { passive: false });
         return () => el.removeEventListener("wheel", onWheel);
-    });
+    }, [t]); // re-register only when zoom/pan state changes, not on every parent re-render
 
     const cursor = t.z === 1 ? "cursor-zoom-in" : dragging ? "cursor-grabbing" : "cursor-zoom-out";
 

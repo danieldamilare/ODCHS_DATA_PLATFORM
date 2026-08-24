@@ -28,6 +28,7 @@
     --animate-fade-in: fade-in 0.3s var(--ease-smooth) both;
     --animate-scale-in: scale-in 0.25s var(--ease-spring) both;
     --animate-slide-in: slide-in 0.2s ease-out both;
+    --animate-slide-in-left: slide-in-left 0.2s ease-out both;
     --animate-slide-up: slide-up 0.3s var(--ease-smooth) both;
     --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
     --animate-shimmer: shimmer 2s linear infinite;
@@ -100,6 +101,11 @@ body {
 @keyframes slide-in {
     from { opacity: 0; transform: translateX(1rem); }
     to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-left {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
 }
 
 @keyframes slide-up {

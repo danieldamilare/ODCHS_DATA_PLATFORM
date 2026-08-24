@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileArchive, Activity, ScanLine, BarChart3, Users, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, FileArchive, Activity, ScanLine, BarChart3, Users, LogOut, Shield, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -9,15 +9,20 @@ const navItems = [
     { icon: BarChart3, name: "Encounter Analysis", to: "/encounter" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen, onClose }) {
     const { user, isAdmin, logout } = useAuth();
 
     const initials = `${user?.first_name?.[0] || ""}${user?.last_name?.[0] || ""}`.toUpperCase() || "U";
 
-    return (
-        <aside className="w-64 gradient-sidebar text-white flex flex-col shrink-0 select-none">
+    const handleNavClick = () => {
+        // Close sidebar on mobile after navigating
+        if (onClose) onClose();
+    };
+
+    const sidebarContent = (
+        <>
             {/* Brand Header */}
-            <div className="px-6 py-6 border-b border-white/[0.06]">
+            <div className="px-6 py-6 border-b border-white/[0.06] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="gradient-primary rounded-lg p-2">
                         <Activity size={18} />
@@ -27,6 +32,15 @@ export default function Sidebar() {
                         <p className="text-[11px] text-slate-400 font-medium">Data Platform</p>
                     </div>
                 </div>
+                {/* Close button — visible only on mobile */}
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    >
+                        <X size={18} />
+                    </button>
+                )}
             </div>
 
             {/* Navigation Items */}
@@ -38,6 +52,7 @@ export default function Sidebar() {
                             key={item.name}
                             to={item.to}
                             end={item.to === "/"}
+                            onClick={handleNavClick}
                             className={({ isActive }) =>
                                 `flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
                                     isActive
@@ -60,6 +75,7 @@ export default function Sidebar() {
                         </p>
                         <NavLink
                             to="/admin/users"
+                            onClick={handleNavClick}
                             className={({ isActive }) =>
                                 `flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
                                     isActive
@@ -108,6 +124,30 @@ export default function Sidebar() {
                     System Online
                 </div>
             </div>
-        </aside>
+        </>
+    );
+
+    return (
+        <>
+            {/* Desktop sidebar — always visible */}
+            <aside className="hidden md:flex w-64 gradient-sidebar text-white flex-col shrink-0 select-none h-full">
+                {sidebarContent}
+            </aside>
+
+            {/* Mobile overlay */}
+            {mobileOpen && (
+                <>
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 z-40 bg-black/50 md:hidden"
+                        onClick={onClose}
+                    />
+                    {/* Slide-in sidebar */}
+                    <aside className="fixed inset-y-0 left-0 z-50 w-64 gradient-sidebar text-white flex flex-col md:hidden animate-slide-in-left">
+                        {sidebarContent}
+                    </aside>
+                </>
+            )}
+        </>
     );
 }

@@ -107,11 +107,11 @@ export default function BatchDetails() {
     }
 
     return (
-        <div className="p-8 space-y-6 animate-fade-in">
+        <div className="p-4 md:p-8 space-y-6 animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate("/enrollment")} className="p-2 rounded-xl hover:bg-slate-100 transition-colors">
+                    <button onClick={() => navigate("/enrollment")} className="p-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0">
                         <ArrowLeft size={20} className="text-slate-500" />
                     </button>
                     <div>
@@ -119,7 +119,7 @@ export default function BatchDetails() {
                         <p className="text-sm text-slate-500">{total} forms · {batch.lga || "—"} / {batch.ward || "—"}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:ml-auto">
                     {isDone && enrolledCount > 0 && (
                         <button
                             onClick={() => navigate(`/enrollment/batches/${batchId}/idcards`)}
@@ -243,14 +243,15 @@ export default function BatchDetails() {
                             <div className="p-12 text-center text-slate-400">No forms match this filter</div>
                         ) : (
                             <>
-                                <table className="w-full">
+                                <div className="overflow-x-auto">
+                                <table className="w-full min-w-[500px]">
                                     <thead>
                                         <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100/80">
-                                            <th className="px-6 py-3 font-semibold">#</th>
-                                            <th className="px-6 py-3 font-semibold">Name</th>
-                                            <th className="px-6 py-3 font-semibold">Status</th>
-                                            <th className="px-6 py-3 font-semibold">Actions</th>
-                                            <th className="px-6 py-3 font-semibold w-10"></th>
+                                            <th className="px-3 md:px-6 py-3 font-semibold">#</th>
+                                            <th className="px-3 md:px-6 py-3 font-semibold">Name</th>
+                                            <th className="px-3 md:px-6 py-3 font-semibold">Status</th>
+                                            <th className="px-3 md:px-6 py-3 font-semibold">Actions</th>
+                                            <th className="px-3 md:px-6 py-3 font-semibold w-10"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -260,22 +261,23 @@ export default function BatchDetails() {
                                                 onClick={() => navigate(`/enrollment/form/${form.id}`)}
                                                 className="border-b border-slate-50 hover:bg-primary-50/30 cursor-pointer transition-colors group"
                                             >
-                                                <td className="px-6 py-3.5 text-xs text-slate-400 font-mono">{form.sequence ?? i + 1}</td>
-                                                <td className="px-6 py-3.5 text-sm font-medium text-slate-700 group-hover:text-primary-700 transition-colors">
+                                                <td className="px-3 md:px-6 py-3.5 text-xs text-slate-400 font-mono">{form.sequence ?? i + 1}</td>
+                                                <td className="px-3 md:px-6 py-3.5 text-sm font-medium text-slate-700 group-hover:text-primary-700 transition-colors">
                                                     {form.surname || form.firstname
                                                         ? `${form.surname || ""} ${form.firstname || ""}`.trim()
                                                         : <span className="text-slate-400 italic">—</span>
                                                     }
                                                 </td>
-                                                <td className="px-6 py-3.5"><StatusBadge status={form.status} /></td>
-                                                <td className="px-6 py-3.5" onClick={(e) => e.stopPropagation()}>
+                                                <td className="px-3 md:px-6 py-3.5"><StatusBadge status={form.status} /></td>
+                                                <td className="px-3 md:px-6 py-3.5" onClick={(e) => e.stopPropagation()}>
                                                     <FormActions form={form} variant="row" onChanged={() => fetchForms()} />
                                                 </td>
-                                                <td className="px-6 py-3.5 text-slate-300 group-hover:text-primary-400 transition-colors"><ChevronRight size={16} /></td>
+                                                <td className="px-3 md:px-6 py-3.5 text-slate-300 group-hover:text-primary-400 transition-colors"><ChevronRight size={16} /></td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
 
                                 {hasMore && (
                                     <div className="py-4 text-center border-t border-slate-100/80">
