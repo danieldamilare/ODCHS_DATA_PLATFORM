@@ -115,8 +115,8 @@ export default function BatchDetails() {
                         <ArrowLeft size={20} className="text-slate-500" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900">Batch {batch.id?.slice(0, 8)}</h1>
-                        <p className="text-sm text-slate-500">{total} forms · {batch.lga || "—"} / {batch.ward || "—"}</p>
+                        <h1 className="text-xl font-bold text-slate-900">{batch.name || `Batch ${batch.id?.slice(0, 8)}`}</h1>
+                        <p className="text-sm text-slate-500">{total} forms · {batch.lga || batch.ward ? `${batch.lga || "—"} / ${batch.ward || "—"}` : "Multiple Locations"}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 sm:ml-auto">

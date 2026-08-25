@@ -58,7 +58,7 @@ const KIN_FIELDS = [
     { key: "kin_firstname", label: "First Name", grid: "col-span-1" },
     { key: "kin_othername", label: "Other Name", grid: "col-span-1" },
     { key: "kin_relationship", label: "Relationship", grid: "col-span-1" },
-    { key: "kin_phone_number", label: "Phone", grid: "col-span-1" },
+    { key: "kin_phone_number", label: "Phone", type: "phone", grid: "col-span-1" },
     { key: "kin_address", label: "Address", type: "textarea", grid: "col-span-2" },
 ];
 
@@ -98,6 +98,7 @@ export default function FormReview() {
     const [loading, setLoading] = useState(true);
     const [enrolling, setEnrolling] = useState(false);
     const [touched, setTouched] = useState({});
+    const [showValidationErrors, setShowValidationErrors] = useState(false);
 
     // Passport
     const [passportFile, setPassportFile] = useState(null);
@@ -449,8 +450,8 @@ export default function FormReview() {
         return null;
     }
 
-    function getPhoneError() {
-        const raw = (fields.phone_number || "").replace(/^\+?234/, "");
+    function getPhoneError(key = "phone_number") {
+        const raw = (fields[key] || "").replace(/^\+?234/, "");
         if (!raw) return null;
         if (!/^\d*$/.test(raw)) return "Phone must contain only numbers";
         if (raw.length > 0 && raw.length !== 10) return `Phone must be 10 digits after +234 (${raw.length}/10)`;
@@ -501,13 +502,16 @@ export default function FormReview() {
     function validateBeforeEnroll() {
         const missing = getMissingRequired();
         if (missing.length > 0) {
+            setShowValidationErrors(true);
             toast.warn("Please fill all compulsory fields before enrolling");
             return false;
         }
+        setShowValidationErrors(false);
         const ninErr = getNinError();
-        const phoneErr = getPhoneError();
-        if (ninErr || phoneErr) {
-            toast.warn(ninErr || phoneErr);
+        const phoneErr = getPhoneError("phone_number");
+        const kinPhoneErr = getPhoneError("kin_phone_number");
+        if (ninErr || phoneErr || kinPhoneErr) {
+            toast.warn(ninErr || phoneErr || kinPhoneErr);
             return false;
         }
         if (rotation !== 0 && !(cropCoords && cropCoords.xmax > 0) && !passportFile && !useAvatar) {
@@ -641,8 +645,10 @@ export default function FormReview() {
             ? (fields.gender?.toLowerCase() === "male" ? form.MALE_AVATAR : form.FEMALE_AVATAR)
             : form.passport_path || croppedPreview || null;
 
+    const isMissing = (key) => showValidationErrors && REQUIRED.has(key) && (fields[key] === "" || fields[key] == null);
     const ninError = touched.nin ? getNinError() : null;
-    const phoneError = touched.phone_number ? getPhoneError() : null;
+    const phoneError = touched.phone_number ? getPhoneError("phone_number") : null;
+    const kinPhoneError = touched.kin_phone_number ? getPhoneError("kin_phone_number") : null;
     const ninMismatches = getNinMismatches();
 
     return (
@@ -817,7 +823,7 @@ export default function FormReview() {
                                             <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
                                                 disabled={isLocked} required={REQUIRED.has(f.key)}
                                                 lgas={lgas} wards={wards} facilities={facilities} categories={categories}
-                                                error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
+                                                error={isMissing(f.key) ? "Compulsory field" : f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
                                             />
                                             {f.key === "nin" && (
                                                 <NinFieldFeedback
@@ -844,6 +850,7 @@ export default function FormReview() {
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
                                             disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                            error={isMissing(f.key) ? "Compulsory field" : null}
                                         />
                                     </div>
                                 ))}
@@ -858,6 +865,7 @@ export default function FormReview() {
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
                                             disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                            error={isMissing(f.key) ? "Compulsory field" : f.key === "kin_phone_number" ? kinPhoneError : null}
                                         />
                                         {f.key === "kin_address" && (
                                             <label className="flex items-center gap-2 mt-2 text-[11px] font-medium text-slate-500 cursor-pointer select-none">
@@ -978,7 +986,7 @@ export default function FormReview() {
                                             <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
                                                 disabled={isLocked} required={REQUIRED.has(f.key)}
                                                 lgas={lgas} wards={wards} facilities={facilities} categories={categories}
-                                                error={f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
+                                                error={isMissing(f.key) ? "Compulsory field" : f.key === "nin" ? ninError : f.key === "phone_number" ? phoneError : null}
                                             />
                                             {f.key === "nin" && (
                                                 <NinFieldFeedback
@@ -1005,6 +1013,7 @@ export default function FormReview() {
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
                                             disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                            error={isMissing(f.key) ? "Compulsory field" : null}
                                         />
                                     </div>
                                 ))}
@@ -1019,6 +1028,7 @@ export default function FormReview() {
                                         <FieldInput field={f} value={fields[f.key] ?? ""} onChange={(v) => updateField(f.key, v)}
                                             disabled={isLocked} required={REQUIRED.has(f.key)}
                                             lgas={lgas} wards={wards} facilities={facilities} categories={categories}
+                                            error={isMissing(f.key) ? "Compulsory field" : f.key === "kin_phone_number" ? kinPhoneError : null}
                                         />
                                         {f.key === "kin_address" && (
                                             <label className="flex items-center gap-2 mt-2 text-[11px] font-medium text-slate-500 cursor-pointer select-none">

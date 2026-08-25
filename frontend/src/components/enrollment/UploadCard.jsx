@@ -16,6 +16,8 @@ export default function UploadCard({ onBatchCreated }) {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [error, setError] = useState(null);
     const [dragOver, setDragOver] = useState(false);
+    const [batchName, setBatchName] = useState("");
+    const [leaveLocationBlank, setLeaveLocationBlank] = useState(false);
 
     useEffect(() => {
         getLGAs()
@@ -46,7 +48,7 @@ export default function UploadCard({ onBatchCreated }) {
     async function handleSubmit(e) {
         e.preventDefault();
         if (!file) return setError("Select a zip file");
-        if (!lgaId || !wardId || !facilityId) return setError("Select LGA, ward, and facility");
+        if (!leaveLocationBlank && (!lgaId || !wardId || !facilityId)) return setError("Select LGA, ward, and facility");
 
         setUploading(true);
         setUploadProgress(0);
@@ -54,9 +56,13 @@ export default function UploadCard({ onBatchCreated }) {
 
         const formData = new FormData();
         formData.append("batch_file", file);
-        formData.append("lga_no", lgaId);
-        formData.append("ward_no", wardId);
-        formData.append("facility_no", facilityId);
+        if (batchName.trim()) formData.append("name", batchName.trim());
+        
+        if (!leaveLocationBlank) {
+            formData.append("lga_no", lgaId);
+            formData.append("ward_no", wardId);
+            formData.append("facility_no", facilityId);
+        }
 
         try {
             const result = await uploadBatch(formData, (pct) => setUploadProgress(pct));
@@ -85,31 +91,61 @@ export default function UploadCard({ onBatchCreated }) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 mt-5">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                            <MapPin size={10} className="inline mr-1" />LGA
-                        </label>
-                        <select value={lgaId} onChange={(e) => setLgaId(e.target.value)} className={selectClass}>
-                            <option value="">Select LGA</option>
-                            {lgas.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1.5">Ward</label>
-                        <select value={wardId} onChange={(e) => setWardId(e.target.value)} disabled={!lgaId} className={selectClass}>
-                            <option value="">Select Ward</option>
-                            {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                            <Building size={10} className="inline mr-1" />Facility
-                        </label>
-                        <select value={facilityId} onChange={(e) => setFacilityId(e.target.value)} disabled={!wardId} className={selectClass}>
-                            <option value="">Select Facility</option>
-                            {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                        </select>
+                <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                        Batch Name (Optional)
+                    </label>
+                    <input
+                        type="text"
+                        value={batchName}
+                        onChange={(e) => setBatchName(e.target.value)}
+                        placeholder="e.g. Akure South Enrollees"
+                        className={selectClass}
+                    />
+                </div>
+
+                <div className="pt-2">
+                    <label className="flex items-center gap-2 mb-3 text-sm text-slate-700 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={leaveLocationBlank}
+                            onChange={(e) => {
+                                setLeaveLocationBlank(e.target.checked);
+                                if (e.target.checked) {
+                                    setLgaId(""); setWardId(""); setFacilityId("");
+                                }
+                            }}
+                            className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
+                        />
+                        <span>This batch spans multiple locations (leave location blank)</span>
+                    </label>
+                    
+                    <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity ${leaveLocationBlank ? 'opacity-40 pointer-events-none' : ''}`}>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                                <MapPin size={10} className="inline mr-1" />LGA
+                            </label>
+                            <select value={lgaId} onChange={(e) => setLgaId(e.target.value)} disabled={leaveLocationBlank} className={selectClass}>
+                                <option value="">Select LGA</option>
+                                {lgas.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1.5">Ward</label>
+                            <select value={wardId} onChange={(e) => setWardId(e.target.value)} disabled={leaveLocationBlank || !lgaId} className={selectClass}>
+                                <option value="">Select Ward</option>
+                                {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                                <Building size={10} className="inline mr-1" />Facility
+                            </label>
+                            <select value={facilityId} onChange={(e) => setFacilityId(e.target.value)} disabled={leaveLocationBlank || !wardId} className={selectClass}>
+                                <option value="">Select Facility</option>
+                                {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                            </select>
+                        </div>
                     </div>
                 </div>
 

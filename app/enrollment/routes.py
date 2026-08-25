@@ -63,6 +63,7 @@ def batch_post():
     try:
         uploader = BatchUploader(
             batch_file=request.files["batch_file"],
+            name=request.form.get("name", ""),
             lga_no=parse_opt_int(request.form.get("lga_no")),
             ward_no=parse_opt_int(request.form.get("ward_no")),
             facility_no=parse_opt_int(request.form.get("facility_no")),
@@ -75,6 +76,7 @@ def batch_post():
         ward_no=uploader.ward_no,
         facility_no=uploader.facility_no,
         file=uploader.batch_file,
+        name=uploader.name,
     )
 
     if result.status == "duplicate":

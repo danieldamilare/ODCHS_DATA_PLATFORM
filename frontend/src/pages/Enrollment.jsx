@@ -78,9 +78,11 @@ export default function Enrollment() {
                                             className="border-b border-slate-50 hover:bg-primary-50/30 cursor-pointer transition-colors group"
                                         >
                                             <td className="px-3 md:px-6 py-4">
-                                                <div className="font-mono text-sm text-slate-700 group-hover:text-primary-700 transition-colors">{batch.id.slice(0, 8)}</div>
+                                                <div className="font-semibold text-sm text-slate-700 group-hover:text-primary-700 transition-colors">
+                                                    {batch.name ? batch.name : <span className="font-mono">{batch.id.slice(0, 8)}</span>}
+                                                </div>
                                                 <div className="text-xs text-slate-400 mt-0.5">
-                                                    {batch.lga || batch.ward ? `${batch.lga || "—"} / ${batch.ward || "—"}` : "Location pending"}
+                                                    {batch.lga || batch.ward ? `${batch.lga || "—"} / ${batch.ward || "—"}` : "Multiple Locations"}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm font-medium text-slate-600">{batch.total}</td>

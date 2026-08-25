@@ -33,16 +33,17 @@ def normalize_category(category: Optional[str]) -> Optional[str]:
     cat = str(category).lower().strip()
 
     if "preg" in cat:
-        return "Pregnant women"
+        return "PREGNANT WOMEN"
     if "elder" in cat or "65" in cat:
-        return "Aged (65 Yrs above)"
+        return "AGED (65 yRS ABOVE)"
     if "child" in cat or "under 5" in cat:
-        return "Children Under 5 Years"
+        return "CHILDREN uNDER 5 yEARS"
     if "disab" in cat:
-        return "People with disabilities"
+        return "PEOPLE WITH DISABILITIES"
     if "widow" in cat:
-        return "Widow/Widower"
+        return "WIDOW/wIDOWER"
     return None
+
 
 def process_category(dob, gender: str, marital_status: str) -> str:
     age = compute_age(dob)
@@ -78,17 +79,17 @@ def normalize_form_object(
 
     form.nin = res.nin
     form.gender = res.gender
-    form.address = res.address
-    form.occupation = res.occupation
+    form.address = str(res.address).capitalize()
+    form.occupation = str(res.occupation).capitalize()
     form.dob = res.dob
     form.phone_number = normalize_ng_phone(res.phone_number)
 
-    form.lga_no = batch['lga_no']
-    form.facility_no = batch['facility_no']
-    form.ward_no = batch['ward_no']
-    form.surname = res.surname
-    form.firstname = res.first_name
-    form.othername = res.other_name
+    form.lga_no = batch["lga_no"]
+    form.facility_no = batch["facility_no"]
+    form.ward_no = batch["ward_no"]
+    form.surname = res.surname.capitalize()
+    form.firstname = res.first_name.capitalize()
+    form.othername = res.other_name.capitalize()
 
     if res.next_of_kin:
         form.kin_firstname = res.next_of_kin.first_name
@@ -114,16 +115,14 @@ def normalize_form_object(
             flagged_reasons.append("Date Format is incorrect, and cannot be parsed")
 
     category = normalize_category(res.category)
-    explicit_category = {"People with disabilities", 
-                         "Widow/Widower",
-                         "Pregnant women" }
+    explicit_category = {"People with disabilities", "Widow/Widower", "Pregnant women"}
 
     if dob:
         if category not in explicit_category:
             category = process_category(
                 dob, form.gender, res.marital_status.value if res.marital_status else ""
             )
-    
+
         form.category = loader.citizen_types.get(category, None)
     else:
         flagged_reasons.append("No date of birth provided cannot determine category")

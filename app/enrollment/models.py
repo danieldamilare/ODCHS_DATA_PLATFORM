@@ -5,6 +5,9 @@ from app import db
 from flask import url_for
 from app.enrollment.dataloader import get_loader
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
 
 class BatchStatus(Enum):
     PROCESSING = "processing"
@@ -15,11 +18,11 @@ class BatchStatus(Enum):
 class FormStatus(Enum):
     PENDING = "pending"
     READY = "ready"
-    ENROLLED = "enrolled"  # Successfully pushed to the remote HIS pipeline
-    FAILED = "failed"  # Error returned from the network API when enrolling
-    REJECTED = "rejected"  # Explicitly marked bad by human validator
+    ENROLLED = "enrolled"
+    FAILED = "failed"
+    REJECTED = "rejected"
     NEED_RESCAN = "need_rescan"
-    ERROR = "error"  # Local extraction or processing pipeline error
+    ERROR = "error"
     ALREADY_EXIST = "already_exist"
 
 
@@ -27,6 +30,7 @@ class Batch(db.Model):
     __tablename__ = "batches"
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String, unique=True, default=lambda: str(uuid_tool.uuid4()))
+    name = db.Column(db.String, nullable=True, default=None)
     total = db.Column(db.Integer, default=0)
     status = db.Column(db.Enum(BatchStatus), default=BatchStatus.PROCESSING)
     lga_no = db.Column(db.Integer, nullable=True)
@@ -36,8 +40,13 @@ class Batch(db.Model):
     state_code = db.Column(db.Integer, nullable=True)
     plan_id = db.Column(db.Integer, nullable=True)
     zip_hash = db.Column(db.Text, nullable=True, unique=True)
-    forms = db.relationship("Form", backref="batch", lazy=True, passive_deletes=True)
-    # job_id = db.Column(db.Integer, db.ForeignKey("jobs.id"), index=True)
+    forms = db.relationship(
+        "Form",
+        backref="batch",
+        lazy=True,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def to_dict(self):
         loader = get_loader()
@@ -46,6 +55,7 @@ class Batch(db.Model):
             "total": self.total,
             "status": self.status.value,
             "plan": "BHCPFP",
+            "name": self.name,
             "state": "Ondo State",
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
@@ -111,11 +121,14 @@ class Form(db.Model):
     settlement = db.Column(db.String(5), nullable=True)
     category = db.Column(db.Integer, nullable=True)
     marital_status = db.Column(db.String(15), nullable=True)
-    occupation = db.Column(db.String, nullable=True)
 
     batch_id = db.Column(
-        db.Integer, db.ForeignKey("batches.id", ondelete="CASCADE"), nullable=False, index=True,
-        
+        db.Integer,
+        db.ForeignKey(
+            "batches.id", name="fk_forms_batch_id_batches", ondelete="CASCADE"
+        ),
+        nullable=False,
+        index=True,
     )
     # enrollee_number is returned from the HIS, useful if we add ID card generation
     enrollee_number = db.Column(db.String, nullable=True, index=True)
@@ -190,7 +203,6 @@ class Form(db.Model):
             "gender": self.gender,
             "phone_number": self.phone_number,
             "nin": self.nin,
-            "occupation": self.occupation,
             "address": self.address,
             "category": self.category,
             "marital_status": self.marital_status,

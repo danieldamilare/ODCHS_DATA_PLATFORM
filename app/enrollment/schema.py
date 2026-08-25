@@ -67,7 +67,7 @@ class BatchUploader(BaseModel):
     lga_no: Optional[int] = None
     ward_no: Optional[int] = None
     facility_no: Optional[int] = None
-
+    name: str = ""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("batch_file")
