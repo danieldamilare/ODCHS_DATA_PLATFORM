@@ -36,7 +36,7 @@ class Batch(db.Model):
     state_code = db.Column(db.Integer, nullable=True)
     plan_id = db.Column(db.Integer, nullable=True)
     zip_hash = db.Column(db.Text, nullable=True, unique=True)
-    forms = db.relationship("Form", backref="batch", lazy=True)
+    forms = db.relationship("Form", backref="batch", lazy=True, passive_deletes=True)
     # job_id = db.Column(db.Integer, db.ForeignKey("jobs.id"), index=True)
 
     def to_dict(self):
@@ -114,7 +114,8 @@ class Form(db.Model):
     occupation = db.Column(db.String, nullable=True)
 
     batch_id = db.Column(
-        db.Integer, db.ForeignKey("batches.id"), nullable=False, index=True
+        db.Integer, db.ForeignKey("batches.id", ondelete="CASCADE"), nullable=False, index=True,
+        
     )
     # enrollee_number is returned from the HIS, useful if we add ID card generation
     enrollee_number = db.Column(db.String, nullable=True, index=True)

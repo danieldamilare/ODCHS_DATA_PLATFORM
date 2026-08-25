@@ -70,6 +70,12 @@ def normalize_form_object(
 ) -> Form:
     flagged_reasons = []
 
+    if not res:
+        form.flagged = True
+        form.reason = "OCR Extraction failed: Model returned no response"
+        form.nin_valid = False
+        return form
+
     form.nin = res.nin
     form.gender = res.gender
     form.address = res.address

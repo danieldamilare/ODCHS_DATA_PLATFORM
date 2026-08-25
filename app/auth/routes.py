@@ -154,11 +154,6 @@ def request_password_reset():
 @auth_bp.post("/login")
 @jwt_required(optional=True)
 def login():
-    if get_jwt():
-        return jsonify({
-            "success": False,
-            "msg": "You are already logged in"
-        }), 400
     try:
         res = LoginValidator.model_validate(request.get_json(silent=True) or {})
     except ValidationError as e:

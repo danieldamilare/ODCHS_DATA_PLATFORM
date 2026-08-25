@@ -28,25 +28,34 @@ class NextOfKin(BaseModel):
     phone_number: str = ""
     address: str = ""
 
-
 class OCRResponse(BaseModel):
-    surname: str = ""
-    first_name: str = ""
-    other_name: Optional[str] = ""
-    dob: str = Field(default="", description="Format: MM-DD-YYYY")
-    marital_status: Optional[MaritalStatusEnum] = None
-    address: str = ""
-    gender: Optional[Gender] = None
-    phone_number: str = ""
-    category: str = ""
-    occupation: str = ""
-    nin: str = ""
+    surname: str = Field(default="", description="Enrollee surname/last name. Empty string if blank.")
+    first_name: str = Field(default="", description="Enrollee first name. Empty string if blank.")
+    other_name: str = Field(default="", description="Enrollee middle/other name. Empty string if blank.")
+    dob: str = Field(default="", description="Date of birth formatted as MM-DD-YYYY. Empty string if unreadable or blank.")
+    marital_status: Optional[MaritalStatusEnum] = Field(
+        default=None, description="Marital status. Null if none selected or blank."
+    )
+    address: str = Field(default="", description="Residential home address. Empty string if blank.")
+    gender: Optional[Gender] = Field(default=None, description="Gender (Male or Female). Null if blank.")
+    phone_number: str = Field(default="", description="Phone number digits only. Empty string if blank.")
+    category: str = Field(
+        default="",
+        description="The category checkbox that is explicitly ticked on the form. Return an empty string if NO checkbox is ticked.",
+    )
+    occupation: str = Field(
+        default="",
+        description="The occupation checkbox ticked or custom occupation written. Return an empty string if blank or unticked.",
+    )
+    nin: str = Field(default="", description="The written National Identity Number. Empty string if blank.")
     next_of_kin: Optional[NextOfKin] = None
 
     @field_validator("surname", "first_name", "other_name", mode="after")
     @classmethod
-    def reject_absurd_length(cls, v):
-        if v and len(v) > 50:
+    def reject_absurd_length(cls, v: Optional[str]) -> str:
+        if v is None:
+            return ""
+        if len(v) > 50:
             raise ValueError(
                 f"Field value implausibly long ({len(v)} chars) — likely extraction failure"
             )

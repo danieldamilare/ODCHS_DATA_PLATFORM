@@ -80,6 +80,7 @@ def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
                 attempt += 1
                 time.sleep(1)
                 continue
+            print(response.text)
 
             try:
                 return OCRResponse.model_validate_json(response.text)

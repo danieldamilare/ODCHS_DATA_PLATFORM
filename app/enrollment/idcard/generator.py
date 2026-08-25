@@ -175,12 +175,6 @@ class IdCardGenerator:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
                 headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",  # Prevents crashes when /dev/shm is small
-                    "--disable-gpu",
-                ]
             )
             try:
                 async with httpx.AsyncClient() as client:
