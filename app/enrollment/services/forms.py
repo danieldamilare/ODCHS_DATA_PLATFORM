@@ -8,6 +8,8 @@ from app.enrollment.schema import FormUpdater
 from app.enrollment.his_client import HISClient, HISEnrollStatus
 from app.enrollment.idcard.generator import IdCardGenerator
 from app.enrollment.utils import generate_id_card_path
+from pydantic import ValidationError
+from app.core.utils import serialize_validation_errors
 from enum import Enum, auto
 import sqlalchemy as sa
 from typing import Optional, Literal
@@ -30,6 +32,7 @@ class FormEnrollmentState(Enum):
     NO_PASSPORT_ERROR = auto()
     HIS_DUPLICATE = auto()
     SUCCESS = auto()
+    VALIDATION_ERROR = auto()
 
 
 @dataclass
@@ -138,6 +141,40 @@ class FormServices:
             },
         }
 
+    def run_validation_on_form(self, form: Form):
+        vals = {
+            "title": form.title,
+            "surname": form.surname,
+            "firstname": form.firstname,
+            "othername": form.othername,
+            "dob": form.dob,
+            "settlement": form.settlement,
+            "gender": form.gender,
+            "phone_number": form.phone_number,
+            "nin": form.nin,
+            "address": form.address,
+            "categoroy": form.category,
+            "marital_status": form.marital_status,
+            "occupation": form.occupation,
+            "kin_firstname": form.kin_firstname,
+            "kin_surname": form.kin_surname,
+            "kin_othername": form.kin_othername,
+            "kin_relationship": form.kin_relationship,
+            "kin_phone_number": form.kin_phone_number,
+            "kin_address": form.kin_address,
+            "lga_no": form.lga_no,
+            "ward_no": form.ward_no,
+            "facility_no": form.facility_no
+        }
+
+        try:
+            FormUpdater.model_validate(vals)
+        except ValidationError as e:
+            return False, serialize_validation_errors(e)
+        return True, ""
+
+
+
     def enroll(self, form_id):
 
         form = self.get(form_id)
@@ -150,8 +187,14 @@ class FormServices:
                 FormEnrollmentState.HIS_DUPLICATE,
                 "You have already enrolled this form before",
             )
-        try:
-            b64_passport = self._get_passport_base64(form)
+        success, err = self.run_validation_on_form(form)
+        if not success:
+            return FormEnrollmentResult(
+                FormEnrollmentState.VALIDATION_ERROR,
+                err
+            )
+
+        try: b64_passport = self._get_passport_base64(form)
         except ValueError as e:
             return FormEnrollmentResult(FormEnrollmentState.NO_PASSPORT_ERROR, str(e))
         loader = get_loader()

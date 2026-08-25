@@ -34,10 +34,11 @@ export async function getBatchDetail(batchId) {
     return request(`/batches/${batchId}`);
 }
 
-export async function getBatchForms(batchId, { status, after, count = 20 } = {}) {
+export async function getBatchForms(batchId, { status, after, before, count = 20 } = {}) {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (after) params.set("after", after);
+    if (before) params.set("before", before);
     params.set("count", count);
     return request(`/batches/${batchId}/forms?${params.toString()}`);
 }

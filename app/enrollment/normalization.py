@@ -157,7 +157,6 @@ def normalize_form_object(
     elif not re.match(r"^\d{11}$", str(form.nin).strip()):
         flagged_reasons.append("Nin is not 11 digits or contains non numeric character")
         form.nin_valid = False
-        form.nin = None
 
     phone_number = form.phone_number
     kin_phone_number = form.kin_phone_number

@@ -150,32 +150,55 @@ def get_batch_forms(batch_id: str):
 
     status_filter = request.args.get("status")
     after = request.args.get("after")
-    count = int(request.args.get("count", 20))
+    before = request.args.get("before")
+    count = max(1, min(int(request.args.get("count", 20)), 100))
 
     query = sa.select(Form).where(Form.batch_id == batch.id)
 
     if status_filter:
-        query = query.where(Form.status == FormStatus(status_filter))
+        try:
+            query = query.where(Form.status == FormStatus(status_filter))
+        except ValueError:
+            return jsonify({"success": False, "msg": f"Invalid status: {status_filter}"}), 400
 
-    if after:
-        cursor_form = db.session.scalar(
-            sa.select(Form.sequence).where(Form.uuid == after)
+    if before:
+        cursor_seq = db.session.scalar(
+            sa.select(Form.sequence).where(Form.uuid == before)
         )
-        if cursor_form is not None:
-            query = query.where(Form.sequence > cursor_form)
+        if cursor_seq is not None:
+            query = query.where(Form.sequence < cursor_seq)
+        
+        query = query.order_by(Form.sequence.desc()).limit(count + 1)
+        forms = list(db.session.scalars(query).all())
+        
+        has_more = len(forms) > count
+        if has_more:
+            forms = forms[:count]
+        
+        forms.reverse()
 
-    query = query.order_by(Form.sequence.asc()).limit(count)
+    else:
+        if after:
+            cursor_seq = db.session.scalar(
+                sa.select(Form.sequence).where(Form.uuid == after)
+            )
+            if cursor_seq is not None:
+                query = query.where(Form.sequence > cursor_seq)
 
-    forms = db.session.scalars(query).all()
+        query = query.order_by(Form.sequence.asc()).limit(count + 1)
+        forms = list(db.session.scalars(query).all())
+
+        has_more = len(forms) > count
+        if has_more:
+            forms = forms[:count]
 
     return jsonify(
         {
             "success": True,
             "data": [f.to_dict() for f in forms],
-            "has_more": len(forms) == count,
+            "has_more": has_more,
         }
     )
-
 
 @enrollment_bp.get("/batches/<string:batch_id>/progress")
 def get_batch_progress_stream(batch_id: str):
@@ -579,7 +602,7 @@ def enroll_form(form_id: str):
     form_service = FormServices()
     result = form_service.enroll(form_id)
 
-    if result.status == FormEnrollmentState.NOT_EXISTS:
+    if result.status in (FormEnrollmentState.NOT_EXISTS, FormEnrollmentState.VALIDATION_ERROR):
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 404
     if result.status == FormEnrollmentState.NO_PASSPORT_ERROR:
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 422

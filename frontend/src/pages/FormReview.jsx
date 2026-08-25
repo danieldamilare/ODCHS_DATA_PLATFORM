@@ -79,7 +79,8 @@ export default function FormReview() {
     // Review queue
     const [queue, setQueue] = useState([]);
     const [queueIndex, setQueueIndex] = useState(0);
-    const [queueHasMore, setQueueHasMore] = useState(true);
+    const [hasMoreNext, setHasMoreNext] = useState(true);
+    const [hasMorePrev, setHasMorePrev] = useState(false);
     const [reviewComplete, setReviewComplete] = useState(false);
     const prefetchingRef = useRef(false);
 
@@ -126,6 +127,7 @@ export default function FormReview() {
 
     // NIN verification override gate (enroll confirm shown whenever NIN isn't "valid")
     const [showNinConfirm, setShowNinConfirm] = useState(false);
+    const [pendingNinAction, setPendingNinAction] = useState(null);
 
     // Cascading dropdowns
     const [lgas, setLgas] = useState([]);
@@ -140,20 +142,31 @@ export default function FormReview() {
         fetchReviewBatch();
     }, [batchId]);
 
-    async function fetchReviewBatch(after) {
+    const PREFETCH_COUNT = 20;
+
+    async function fetchReviewBatch(after = null, before = null) {
         if (prefetchingRef.current) return;
         prefetchingRef.current = true;
         try {
-            const res = await getBatchForms(batchId, { status: "ready", after, count: PREFETCH_COUNT });
+            const res = await getBatchForms(batchId, { status: "ready", after, before, count: PREFETCH_COUNT });
             const newForms = res.data || [];
-            setQueueHasMore(res.has_more || false);
-            if (newForms.length === 0 && !after) {
-                setReviewComplete(true);
-                setLoading(false);
-                return;
-            }
-            setQueue((prev) => [...prev, ...newForms]);
-            if (!after) {
+            
+            if (after) {
+                setHasMoreNext(res.has_more || false);
+                setQueue((prev) => [...prev, ...newForms]);
+            } else if (before) {
+                setHasMorePrev(res.has_more || false);
+                setQueue((prev) => [...newForms, ...prev]);
+                setQueueIndex((prev) => prev + newForms.length); // shift index
+            } else {
+                setHasMoreNext(res.has_more || false);
+                setHasMorePrev(res.has_prev || false);
+                if (newForms.length === 0) {
+                    setReviewComplete(true);
+                    setLoading(false);
+                    return;
+                }
+                setQueue(newForms);
                 setCurrentFormId(newForms[0]?.id);
                 setQueueIndex(0);
             }
@@ -165,21 +178,44 @@ export default function FormReview() {
     }
 
     useEffect(() => {
-        if (!isReviewMode || !queueHasMore) return;
-        const remaining = queue.length - queueIndex;
-        if (remaining <= 2 && queue.length > 0) {
-            fetchReviewBatch(queue[queue.length - 1]?.id);
+        if (!isReviewMode) return;
+        
+        // Fetch NEXT if getting close to end
+        const remainingNext = queue.length - queueIndex;
+        if (remainingNext <= 3 && hasMoreNext && queue.length > 0) {
+            fetchReviewBatch(queue[queue.length - 1]?.id, null);
         }
-    }, [queueIndex, queue.length, queueHasMore]);
+        
+        // Fetch PREV if getting close to start
+        if (queueIndex <= 2 && hasMorePrev && queue.length > 0) {
+            fetchReviewBatch(null, queue[0]?.id);
+        }
+    }, [queueIndex, queue.length, hasMoreNext, hasMorePrev, isReviewMode]);
 
     function advanceToNext() {
         const nextIdx = queueIndex + 1;
         if (nextIdx < queue.length) {
             setQueueIndex(nextIdx);
             setCurrentFormId(queue[nextIdx].id);
-        } else if (!queueHasMore) {
+        } else if (!hasMoreNext) {
             setReviewComplete(true);
         }
+    }
+
+    function navigateHeader(direction) {
+        if (Object.keys(touched).length > 0) {
+            if (!window.confirm("You have unsaved changes. Discard and leave?")) return;
+        }
+        if (direction === "next") {
+            advanceToNext();
+        } else if (direction === "prev") {
+            const prevIdx = queueIndex - 1;
+            if (prevIdx >= 0) {
+                setQueueIndex(prevIdx);
+                setCurrentFormId(queue[prevIdx].id);
+            }
+        }
+        setTouched({});
     }
 
     // ═══════════════ Session timer ═══════════════
@@ -202,7 +238,7 @@ export default function FormReview() {
     useEffect(() => {
         if (!queue || queue.length === 0) return;
         queue.forEach((qf, i) => {
-            if (i > queueIndex && i <= queueIndex + 3) {
+            if (i >= queueIndex - 1 && i <= queueIndex + 3 && i !== queueIndex) {
                 if (qf.img_path) fetch(qf.img_path, { credentials: "include" }).catch(() => {});
                 if (qf.passport_path) fetch(qf.passport_path, { credentials: "include" }).catch(() => {});
             }
@@ -489,12 +525,22 @@ export default function FormReview() {
 
     async function handleEnroll() {
         if (!validateBeforeEnroll()) return;
-        // Enroll gate: only a live "valid" verdict enrolls straight through.
-        // Anything else — invalid, couldn't-verify, still-verifying, or never-run —
-        // routes through the override confirm modal.
         if (ninStatus === "valid") {
             doEnroll(true);
         } else {
+            // Need a way to tell the NinConfirmModal we are enrolling, not just saving
+            // Since NinConfirmModal is generic, let's store the pending action
+            setPendingNinAction("enroll");
+            setShowNinConfirm(true);
+        }
+    }
+
+    async function handleSave() {
+        if (!validateBeforeEnroll()) return;
+        if (ninStatus === "valid") {
+            doSave(true);
+        } else {
+            setPendingNinAction("save");
             setShowNinConfirm(true);
         }
     }
@@ -546,11 +592,39 @@ export default function FormReview() {
             } else {
                 toast.success(res.msg || "Enrolled successfully");
             }
+            setTouched({});
             if (isReviewMode) { setEnrollCount((c) => c + 1); advanceToNext(); } else {
                 loadForm(currentFormId);
             }
         } catch (err) {
             toast.error(err?.msg || "Enrollment failed");
+        } finally { setEnrolling(false); }
+    }
+
+    async function doSave(ninVerified) {
+        setShowNinConfirm(false);
+        setEnrolling(true); // Re-use the loading overlay state
+        try {
+            if (passportFile) await uploadPassport(currentFormId, passportFile);
+            const payload = { ...fields };
+            payload.nin_verified = ninVerified;
+            if (payload.dob) payload.dob = dobFromISO(payload.dob);
+            if (useAvatar) payload.use_avatar = true;
+            if (rotation !== 0) payload.rotate_angle = rotation;
+            if (cropCoords && cropCoords.xmax > 0) {
+                payload.passport_xmin = cropCoords.xmin;
+                payload.passport_ymin = cropCoords.ymin;
+                payload.passport_xmax = cropCoords.xmax;
+                payload.passport_ymax = cropCoords.ymax;
+            }
+            await updateForm(currentFormId, payload);
+            toast.success("Draft saved successfully");
+            setTouched({});
+            if (isReviewMode) { advanceToNext(); } else {
+                loadForm(currentFormId);
+            }
+        } catch (err) {
+            toast.error(err?.msg || "Save failed");
         } finally { setEnrolling(false); }
     }
 
@@ -659,6 +733,7 @@ export default function FormReview() {
                     <button
                         onClick={() => isReviewMode ? setShowCancelConfirm(true) : navigate(-1)}
                         className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+                        title="Back to queue"
                     >
                         <ArrowLeft size={18} className="text-slate-500" />
                     </button>
@@ -668,6 +743,30 @@ export default function FormReview() {
                         </h1>
                         <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">{form.status}</p>
                     </div>
+                    
+                    {isReviewMode && (
+                        <div className="flex items-center gap-1 ml-4 bg-slate-100 p-1 rounded-lg">
+                            <button
+                                onClick={() => navigateHeader("prev")}
+                                disabled={queueIndex === 0 && !hasMorePrev}
+                                className="px-3 py-1 rounded text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all font-bold"
+                                title="Previous Form"
+                            >
+                                &lt;
+                            </button>
+                            <div className="text-[11px] text-slate-400 font-medium px-1">
+                                {queueIndex + 1}
+                            </div>
+                            <button
+                                onClick={() => navigateHeader("next")}
+                                disabled={queueIndex === queue.length - 1 && !hasMoreNext}
+                                className="px-3 py-1 rounded text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all font-bold"
+                                title="Next Form"
+                            >
+                                &gt;
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
                     {isReviewMode ? (
@@ -910,6 +1009,10 @@ export default function FormReview() {
                                             </div>
                                         </div>
                                     )}
+                                    <button onClick={handleSave} disabled={enrolling}
+                                        className="flex-1 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 py-3 text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                                        Save & Skip
+                                    </button>
                                     <button onClick={handleEnroll} disabled={enrolling}
                                         className="flex-1 gradient-primary rounded-xl text-white py-3 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
                                         {enrolling && <Loader2 size={14} className="animate-spin" />}
@@ -1073,6 +1176,10 @@ export default function FormReview() {
                                             </div>
                                         </div>
                                     )}
+                                    <button onClick={handleSave} disabled={enrolling}
+                                        className="flex-1 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 py-3 text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                                        Save & Skip
+                                    </button>
                                     <button onClick={handleEnroll} disabled={enrolling}
                                         className="flex-1 gradient-primary rounded-xl text-white py-3 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
                                         {enrolling && <Loader2 size={14} className="animate-spin" />}
@@ -1137,7 +1244,10 @@ export default function FormReview() {
                     message={ninMessage}
                     busy={enrolling}
                     onCancel={() => setShowNinConfirm(false)}
-                    onConfirm={() => doEnroll(false)}
+                    onConfirm={() => {
+                        if (pendingNinAction === "save") doSave(false);
+                        else doEnroll(false);
+                    }}
                 />
             )}
         </div>
