@@ -13,6 +13,7 @@ export default function UploadCard({ onBatchCreated }) {
     const [facilityId, setFacilityId] = useState("");
 
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [error, setError] = useState(null);
     const [dragOver, setDragOver] = useState(false);
 
@@ -48,6 +49,7 @@ export default function UploadCard({ onBatchCreated }) {
         if (!lgaId || !wardId || !facilityId) return setError("Select LGA, ward, and facility");
 
         setUploading(true);
+        setUploadProgress(0);
         setError(null);
 
         const formData = new FormData();
@@ -57,13 +59,14 @@ export default function UploadCard({ onBatchCreated }) {
         formData.append("facility_no", facilityId);
 
         try {
-            const result = await uploadBatch(formData);
+            const result = await uploadBatch(formData, (pct) => setUploadProgress(pct));
             onBatchCreated(result.data);
             setFile(null);
         } catch (err) {
             setError(err.msg || "Upload failed");
         } finally {
             setUploading(false);
+            setUploadProgress(0);
         }
     }
 
@@ -144,10 +147,33 @@ export default function UploadCard({ onBatchCreated }) {
                 <button
                     type="submit"
                     disabled={uploading}
-                    className="w-full gradient-primary rounded-xl text-white py-3 text-sm font-semibold disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-primary-500/25 flex justify-center items-center gap-2"
+                    className="w-full relative overflow-hidden rounded-xl py-3 text-sm font-semibold transition-all disabled:cursor-not-allowed mt-2"
                 >
-                    <Upload size={16} />
-                    {uploading ? "Uploading..." : "Upload Batch"}
+                    <div 
+                        className="absolute inset-0 bg-primary-600"
+                        style={{
+                            background: uploading ? "#94a3b8" : undefined
+                        }}
+                    />
+                    {!uploading && (
+                        <div className="absolute inset-0 gradient-primary hover:shadow-lg hover:shadow-primary-500/25 transition-all" />
+                    )}
+                    {uploading && uploadProgress < 100 && (
+                        <div 
+                            className="absolute inset-y-0 left-0 bg-primary-900/30 transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                        />
+                    )}
+                    <div className="relative flex justify-center items-center gap-2 text-white z-10">
+                        <Upload size={16} />
+                        <span>
+                            {uploading 
+                                ? uploadProgress < 100 
+                                    ? `Uploading... ${uploadProgress}%` 
+                                    : "Processing..." 
+                                : "Upload Batch"}
+                        </span>
+                    </div>
                 </button>
             </form>
         </div>

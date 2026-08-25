@@ -1,4 +1,4 @@
-import { client, downloadFile } from "./client";
+import { client, downloadFile, uploadFile } from "./client";
 
 const BASE = "/api/nin";
 
@@ -52,7 +52,7 @@ function jobIdFromUrl(url) {
     return m ? m[1] : null;
 }
 
-export async function startNinBatch({ file, generateReport = false, aggregateBy = null }) {
+export async function startNinBatch({ file, generateReport = false, aggregateBy = null, onProgress = null }) {
     const fd = new FormData();
     fd.append("batch_file", file);
     fd.append("generate_report", generateReport ? "true" : "false");
@@ -60,10 +60,10 @@ export async function startNinBatch({ file, generateReport = false, aggregateBy 
     fd.append("aggregate_by_lga_facility", aggregateBy === "facility" ? "true" : "false");
 
     try {
-        const res = await client(`${BASE}/batch/validate`, {
+        const res = await uploadFile(`${BASE}/batch/validate`, {
             method: "POST",
             body: fd,
-        });
+        }, onProgress);
 
         return {
             ok: true,

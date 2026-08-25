@@ -1,4 +1,4 @@
-import { client, downloadFile } from "./client";
+import { client, downloadFile, uploadFile } from "./client";
 
 const BASE = "/api/encounter";
 
@@ -22,14 +22,14 @@ export const ORANGHIS_REQUIRED_COLUMNS = ["age", "client name", "diagnosis", "se
  * Start an encounter job. Returns { ok, jobId, msg }.
  * BHCPF currently returns 501 with a server-supplied message — surfaced as ok:false.
  */
-export async function startEncounterJob({ file, encounterType, chaiOnly = false }) {
+export async function startEncounterJob({ file, encounterType, chaiOnly = false, onProgress = null }) {
     const fd = new FormData();
     fd.append("encounter_file", file);
     fd.append("encounter_type", encounterType);
     fd.append("chai_only", chaiOnly ? "true" : "false");
 
     try {
-        const res = await client(`${BASE}/upload`, { method: "POST", body: fd });
+        const res = await uploadFile(`${BASE}/upload`, { method: "POST", body: fd }, onProgress);
         return { ok: !!res.success, jobId: res.job_id || null, msg: res.msg || "Encounter job started" };
     } catch (err) {
         // 501 (BHCPF) / 400 / 500 all land here with the server's own message.

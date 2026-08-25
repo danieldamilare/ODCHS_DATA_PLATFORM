@@ -375,6 +375,7 @@ function BatchValidation({ routeJobId }) {
     const [notFound, setNotFound] = useState(false);
     const [meta, setMeta] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const fileRef = useRef();
 
     const { progress, phase: streamPhase, done, error } = useNinBatchProgress(activeJobId);
@@ -410,11 +411,13 @@ function BatchValidation({ routeJobId }) {
             return;
         }
         setPhase("submitting");
+        setUploadProgress(0);
         try {
             const res = await startNinBatch({
                 file,
                 generateReport,
                 aggregateBy: aggregateBy === "none" ? null : aggregateBy,
+                onProgress: (pct) => setUploadProgress(pct),
             });
             if (res.duplicate) toast?.warn?.(res.msg);
             else toast?.success?.(res.msg);
@@ -634,10 +637,34 @@ function BatchValidation({ routeJobId }) {
                     <button
                         onClick={handleSubmit}
                         disabled={!file || submitting}
-                        className="w-full gradient-primary rounded-xl text-white py-3 text-sm font-semibold hover:shadow-lg hover:shadow-primary-500/25 transition-all disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed mt-2"
+                        className="w-full relative overflow-hidden rounded-xl py-3 text-sm font-semibold transition-all cursor-pointer disabled:cursor-not-allowed mt-2"
                     >
-                        {submitting ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
-                        <span>{submitting ? "Initiating Batch Task…" : "Start Batch Validation"}</span>
+                        <div 
+                            className="absolute inset-0 bg-primary-600"
+                            style={{
+                                background: submitting || !file ? "#94a3b8" : undefined
+                            }}
+                        />
+                        {/* Only show default gradient if NOT disabled and NOT submitting */}
+                        {!(submitting || !file) && (
+                            <div className="absolute inset-0 gradient-primary hover:shadow-lg hover:shadow-primary-500/25 transition-all" />
+                        )}
+                        {submitting && uploadProgress < 100 && (
+                            <div 
+                                className="absolute inset-y-0 left-0 bg-primary-900/30 transition-all duration-300" 
+                                style={{ width: `${uploadProgress}%` }}
+                            />
+                        )}
+                        <div className="relative py-0 flex items-center justify-center gap-2 text-white z-10">
+                            {submitting ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
+                            <span>
+                                {submitting 
+                                    ? uploadProgress < 100 
+                                        ? `Uploading... ${uploadProgress}%` 
+                                        : "Initiating Batch Task…" 
+                                    : "Start Batch Validation"}
+                            </span>
+                        </div>
                     </button>
                 </div>
             </div>

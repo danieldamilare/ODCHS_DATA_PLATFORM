@@ -190,3 +190,107 @@ export async function downloadFile(url, fallbackName = "download") {
     anchor.remove();
     URL.revokeObjectURL(blobUrl);
 }
+
+/**
+ * Universal File Upload Helper (with progress tracking)
+ *
+ * Uses XMLHttpRequest to track upload progress while maintaining the same
+ * CSRF and silent 401 refresh-and-replay capabilities as the standard client().
+ */
+export async function uploadFile(url, options = {}, onProgress = null, retryCount = 0) {
+    const headers = { ...(options.headers || {}) };
+
+    const method = (options.method || "POST").toUpperCase();
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+        const csrfToken = getCookie("csrf_access_token");
+        if (csrfToken && !headers["X-CSRF-TOKEN"]) {
+            headers["X-CSRF-TOKEN"] = csrfToken;
+        }
+    }
+
+    let response = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, url, true);
+        
+        // Apply headers
+        for (const [key, value] of Object.entries(headers)) {
+            xhr.setRequestHeader(key, value);
+        }
+
+        // Setup progress
+        if (onProgress && xhr.upload) {
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    onProgress(percentComplete, e.loaded, e.total);
+                }
+            };
+        }
+
+        xhr.onload = () => {
+            resolve({
+                status: xhr.status,
+                ok: xhr.status >= 200 && xhr.status < 300,
+                text: () => Promise.resolve(xhr.responseText),
+                json: () => {
+                    try {
+                        return Promise.resolve(JSON.parse(xhr.responseText));
+                    } catch {
+                        return Promise.reject(new Error("Invalid JSON"));
+                    }
+                }
+            });
+        };
+
+        xhr.onerror = () => {
+            reject({ success: false, msg: "Network connection error" });
+        };
+
+        xhr.send(options.body);
+    });
+
+    // ── 401 interception ──────────────────────────────────────────────
+    if (response.status === 401 && retryCount === 0) {
+        if (!isRefreshing) {
+            isRefreshing = true;
+            const refreshSuccess = await executeRefreshToken();
+            isRefreshing = false;
+            onRefreshed(refreshSuccess);
+
+            if (refreshSuccess) {
+                return uploadFile(url, options, onProgress, retryCount + 1);
+            }
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("auth:session-expired"));
+            }
+            throw { success: false, msg: "Session expired. Please log in again." };
+        }
+
+        return new Promise((resolve, reject) => {
+            subscribeTokenRefresh(async (success) => {
+                if (success) {
+                    try {
+                        resolve(await uploadFile(url, options, onProgress, retryCount + 1));
+                    } catch (err) {
+                        reject(err);
+                    }
+                } else {
+                    reject({ success: false, msg: "Session expired. Please log in again." });
+                }
+            });
+        });
+    }
+
+    let data;
+    try {
+        data = await response.json();
+    } catch {
+        data = { success: response.ok, msg: response.ok ? "Success" : "Invalid server response" };
+    }
+
+    if (!response.ok) {
+        throw data;
+    }
+
+    return data;
+}

@@ -1,4 +1,4 @@
-import { client, downloadFile } from "./client";
+import { client, downloadFile, uploadFile } from "./client";
 
 const BASE = "/api/enrollment";
 
@@ -22,8 +22,8 @@ export async function getCategories() {
     return request("/categories");
 }
 
-export async function uploadBatch(formData) {
-    return request("/batches", { method: "POST", body: formData });
+export async function uploadBatch(formData, onProgress = null) {
+    return uploadFile(`${BASE}/batches`, { method: "POST", body: formData }, onProgress);
 }
 
 export async function getBatches(page = 1) {

@@ -63,6 +63,7 @@ function UploadForm() {
     const [chaiOnly, setChaiOnly] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     async function handleSubmit() {
         if (!file) {
@@ -70,8 +71,14 @@ function UploadForm() {
             return;
         }
         setSubmitting(true);
+        setUploadProgress(0);
         try {
-            const res = await startEncounterJob({ file, encounterType, chaiOnly });
+            const res = await startEncounterJob({ 
+                file, 
+                encounterType, 
+                chaiOnly,
+                onProgress: (pct) => setUploadProgress(pct)
+            });
             if (!res.ok) {
                 toast?.error?.(res.msg);
                 return;
@@ -83,6 +90,7 @@ function UploadForm() {
             toast?.error?.(err?.msg || "Could not start encounter job");
         } finally {
             setSubmitting(false);
+            setUploadProgress(0);
         }
     }
 
@@ -151,15 +159,21 @@ function UploadForm() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                <div className="p-2.5 rounded-lg bg-slate-200 text-slate-700">
+                            <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 relative overflow-hidden">
+                                {submitting && (
+                                    <div 
+                                        className="absolute inset-y-0 left-0 bg-slate-200/50 transition-all duration-300"
+                                        style={{ width: `${uploadProgress}%` }}
+                                    />
+                                )}
+                                <div className="p-2.5 rounded-lg bg-slate-200 text-slate-700 relative z-10">
                                     {file.name.toLowerCase().endsWith(".zip") ? (
                                         <FileArchive size={20} />
                                     ) : (
                                         <FileSpreadsheet size={20} />
                                     )}
                                 </div>
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 relative z-10">
                                     <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
                                     <p className="text-xs text-slate-500 mt-0.5">
                                         {(file.size / 1024).toFixed(1)} KB
@@ -167,7 +181,8 @@ function UploadForm() {
                                 </div>
                                 <button
                                     onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}
-                                    className="p-1.5 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                                    disabled={submitting}
+                                    className="p-1.5 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer relative z-10 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <X size={15} />
                                 </button>
@@ -209,8 +224,9 @@ function UploadForm() {
                                     <button
                                         key={engine.id}
                                         type="button"
+                                        disabled={submitting}
                                         onClick={() => setEncounterType(engine.id)}
-                                        className={`text-left p-3.5 rounded-lg border-2 transition-all cursor-pointer ${
+                                        className={`text-left p-3.5 rounded-lg border-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                                             encounterType === engine.id
                                                 ? "border-slate-800 bg-slate-900 text-white"
                                                 : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
@@ -235,8 +251,10 @@ function UploadForm() {
 
                         {/* CHAI only toggle */}
                         <div
-                            onClick={() => setChaiOnly(!chaiOnly)}
-                            className={`flex items-center justify-between p-3.5 rounded-lg border-2 cursor-pointer transition-all ${
+                            onClick={() => !submitting && setChaiOnly(!chaiOnly)}
+                            className={`flex items-center justify-between p-3.5 rounded-lg border-2 transition-all ${
+                                submitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                            } ${
                                 chaiOnly
                                     ? "border-slate-800 bg-slate-900"
                                     : "border-slate-200 hover:border-slate-400 hover:bg-slate-50"
@@ -273,15 +291,32 @@ function UploadForm() {
                         <button
                             onClick={handleSubmit}
                             disabled={!file || submitting}
-                            className="w-full mt-1 py-3 rounded-lg text-sm font-bold text-white transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            style={{ background: submitting || !file ? undefined : "linear-gradient(135deg, #1e293b 0%, #334155 100%)" }}
+                            className="w-full relative overflow-hidden rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
                         >
-                            {submitting ? (
-                                <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                                <ScanLine size={16} />
+                            <div 
+                                className="absolute inset-0 bg-slate-800"
+                                style={{
+                                    background: submitting || !file ? "#94a3b8" : "linear-gradient(135deg, #1e293b 0%, #334155 100%)"
+                                }}
+                            />
+                            {submitting && uploadProgress < 100 && (
+                                <div 
+                                    className="absolute inset-y-0 left-0 bg-slate-900/40 transition-all duration-300" 
+                                    style={{ width: `${uploadProgress}%` }}
+                                />
                             )}
-                            {submitting ? "Starting analysis…" : "Start Encounter Analysis"}
+                            <div className="relative py-3 flex items-center justify-center gap-2 text-sm font-bold text-white z-10">
+                                {submitting ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <ScanLine size={16} />
+                                )}
+                                {submitting 
+                                    ? uploadProgress < 100 
+                                        ? `Uploading... ${uploadProgress}%` 
+                                        : "Starting analysis…" 
+                                    : "Start Encounter Analysis"}
+                            </div>
                         </button>
                     </div>
                 </div>
