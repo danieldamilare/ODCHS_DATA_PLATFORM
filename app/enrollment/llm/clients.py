@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 GEMINI_CIRCUIT = "Gemini:circuit_breaker"
 CIRCUIT_BREAKER_SECONDS = 180
 
-MODEL_NAME = "gemini-3.5-flash"
+MODEL_NAME = "gemini-2.5-flash-lite"
 
 
 class LLMExtractionFailed(Exception):
