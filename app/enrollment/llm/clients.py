@@ -29,8 +29,6 @@ CIRCUIT_BREAKER_SECONDS = 180
 
 MODEL_NAME = "gemini-3.5-flash"
 
-API_KEY = os.getenv("GOOGLE_API_KEY")
-
 
 class LLMExtractionFailed(Exception):
     pass
@@ -81,7 +79,10 @@ def _call_gemini(image_path: str) -> OCRResponse:
     if kv.get(GEMINI_CIRCUIT):
         raise ServerConnectionError("Server is currently down. Gently waiting")
 
-    client = genai.Client(api_key=current_app.config['GEMINI_API_KEY'])
+    client = genai.Client(
+        api_key=current_app.config["GEMINI_API_KEY"],
+        http_options=types.HttpOptions(timeout=60000),
+    )
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         temperature=0,
@@ -109,6 +110,8 @@ def _call_gemini(image_path: str) -> OCRResponse:
 
 
 def gemini_client(image_path: str) -> OCRResponse:
+    if kv.get(GEMINI_CIRCUIT):
+        raise ServerConnectionError("Server is currently down. Gently waiting")
     try:
         return _call_gemini(image_path)
     except Exception as e:
