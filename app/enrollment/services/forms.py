@@ -31,6 +31,7 @@ class FormEnrollmentState(Enum):
     HIS_ERROR = auto()
     NO_PASSPORT_ERROR = auto()
     HIS_DUPLICATE = auto()
+    ALREADY_ENROLLED = auto()
     SUCCESS = auto()
     VALIDATION_ERROR = auto()
 
@@ -142,6 +143,7 @@ class FormServices:
         }
 
     def run_validation_on_form(self, form: Form):
+
         vals = {
             "title": form.title,
             "surname": form.surname,
@@ -153,7 +155,7 @@ class FormServices:
             "phone_number": form.phone_number,
             "nin": form.nin,
             "address": form.address,
-            "categoroy": form.category,
+            "category": form.category,
             "marital_status": form.marital_status,
             "occupation": form.occupation,
             "kin_firstname": form.kin_firstname,
@@ -170,6 +172,7 @@ class FormServices:
         try:
             FormUpdater.model_validate(vals)
         except ValidationError as e:
+            print(str(e))
             return False, serialize_validation_errors(e)
         return True, ""
 
@@ -184,7 +187,7 @@ class FormServices:
             )
         if form.status == FormStatus.ENROLLED:
             return FormEnrollmentResult(
-                FormEnrollmentState.HIS_DUPLICATE,
+                FormEnrollmentState.ALREADY_ENROLLED,
                 "You have already enrolled this form before",
             )
         success, err = self.run_validation_on_form(form)
@@ -240,10 +243,7 @@ class FormServices:
         form = db.session.scalar(sa.select(Form).where(Form.uuid == form_id))
         if not form:
             return FormUpdateResult("invalid", "No form with the given id")
-        if (
-            form.status == FormStatus.ENROLLED
-            or form.status == FormStatus.ALREADY_EXIST
-        ):
+        if  form.status == FormStatus.ENROLLED:
             return FormUpdateResult(
                 "invalid", "You cannot update a form that has been enrolled"
             )

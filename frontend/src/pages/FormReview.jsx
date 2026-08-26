@@ -169,6 +169,7 @@ export default function FormReview() {
                 setQueue(newForms);
                 setCurrentFormId(newForms[0]?.id);
                 setQueueIndex(0);
+                applyCachedForm(newForms[0]);
             }
         } catch {
             toast.error("Failed to load review queue");
@@ -197,6 +198,7 @@ export default function FormReview() {
         if (nextIdx < queue.length) {
             setQueueIndex(nextIdx);
             setCurrentFormId(queue[nextIdx].id);
+            applyCachedForm(queue[nextIdx]);
         } else if (!hasMoreNext) {
             setReviewComplete(true);
         }
@@ -213,6 +215,7 @@ export default function FormReview() {
             if (prevIdx >= 0) {
                 setQueueIndex(prevIdx);
                 setCurrentFormId(queue[prevIdx].id);
+                applyCachedForm(queue[prevIdx]);
             }
         }
         setTouched({});
@@ -247,10 +250,33 @@ export default function FormReview() {
 
     // ═══════════════ Form loading ═══════════════
 
+    function applyCachedForm(cached) {
+        setLoading(false);
+        warmNin();
+        resetFormState();
+        setForm(cached);
+        setFields(unpackForm(cached));
+        setTouched({});
+        const coords = cached.passport_coord || {};
+        setCropCoords({
+            xmin: coords.xmin || 0, ymin: coords.ymin || 0,
+            xmax: coords.xmax || 0, ymax: coords.ymax || 0,
+        });
+    }
+
     useEffect(() => {
         if (!currentFormId) return;
+        if (form && form.id === currentFormId) return; // already applied
+        
+        if (isReviewMode && queue.length > 0) {
+            const cached = queue.find(f => f.id === currentFormId);
+            if (cached) {
+                applyCachedForm(cached);
+                return;
+            }
+        }
         loadForm(currentFormId);
-    }, [currentFormId]);
+    }, [currentFormId, isReviewMode, form, queue]);
 
     function loadForm(id) {
         setLoading(true);
@@ -787,7 +813,7 @@ export default function FormReview() {
                                 </span>
                             )}
                             <span className="gradient-primary text-white px-3.5 py-2 rounded-full text-xs font-bold shadow-md shadow-primary-500/20">
-                                {queueIndex + 1} / {queueHasMore ? `${queue.length}+` : queue.length}
+                                {queueIndex + 1} / {hasMoreNext ? `${queue.length}+` : queue.length}
                             </span>
                             <button
                                 onClick={() => setShowCancelConfirm(true)}

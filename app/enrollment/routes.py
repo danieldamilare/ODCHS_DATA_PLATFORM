@@ -601,17 +601,25 @@ def reject_form(form_id: str):
 def enroll_form(form_id: str):
     form_service = FormServices()
     result = form_service.enroll(form_id)
+    if result.status == FormEnrollmentState.VALIDATION_ERROR:
+        return jsonify({"success": False, "status": "error", "msg": result.msg}), 400
 
-    if result.status in (FormEnrollmentState.NOT_EXISTS, FormEnrollmentState.VALIDATION_ERROR):
+    if result.status in (FormEnrollmentState.NOT_EXISTS,):
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 404
     if result.status == FormEnrollmentState.NO_PASSPORT_ERROR:
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 422
     if result.status == FormEnrollmentState.HIS_ERROR:
         return jsonify({"success": False, "status": "error", "msg": result.msg}), 502
+    if result.status == FormEnrollmentState.ALREADY_ENROLLED:
+        return (
+            jsonify({"success": False, "status": "already_enrolled", "msg": result.msg}),
+            409,
+        )
+
     if result.status == FormEnrollmentState.HIS_DUPLICATE:
         return (
-            jsonify({"success": False, "status": "duplicate", "msg": result.msg}),
-            409,
+                jsonify({"success": True, "status": "duplicate", "msg": f"Skipped: {result.msg}"}),
+            200,
         )
     return jsonify({"success": True, "status": "success", "msg": result.msg}), 200
 
