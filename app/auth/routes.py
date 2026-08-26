@@ -1,4 +1,4 @@
-from app import db, kv
+from app import db
 from app.auth import auth_bp
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from app.auth.models import User, UserStatus, UserSession
@@ -8,7 +8,6 @@ from app.auth.schema import EmailValidator, LoginValidator
 from app.core.utils import serialize_validation_errors
 from app.core.tasks import send_email
 from pydantic import ValidationError
-from datetime import datetime, timezone
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, set_access_cookies, set_refresh_cookies, get_jwt, unset_jwt_cookies
 from uuid import uuid4
 from werkzeug.security import check_password_hash

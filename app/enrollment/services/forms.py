@@ -188,13 +188,15 @@ class FormServices:
                 "You have already enrolled this form before",
             )
         success, err = self.run_validation_on_form(form)
+
         if not success:
             return FormEnrollmentResult(
                 FormEnrollmentState.VALIDATION_ERROR,
                 err
             )
 
-        try: b64_passport = self._get_passport_base64(form)
+        try: 
+            b64_passport = self._get_passport_base64(form)
         except ValueError as e:
             return FormEnrollmentResult(FormEnrollmentState.NO_PASSPORT_ERROR, str(e))
         loader = get_loader()

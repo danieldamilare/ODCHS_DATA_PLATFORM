@@ -5,9 +5,6 @@ from app import db
 from flask import url_for
 from app.enrollment.dataloader import get_loader
 
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-
 
 class BatchStatus(Enum):
     PROCESSING = "processing"

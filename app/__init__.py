@@ -38,10 +38,10 @@ def create_app(config=Config):
     from app.encounter import encounter_bp
     from app.auth import auth_bp
     from app.admin import admin_bp
-    from app.auth import models as auth_models
-    from app.encounter import models as encounter_models
-    from app.enrollment import models as enrollment_models
-    from app.jobs import models as job_models
+    from app.auth import models as auth_models #noqa
+    from app.encounter import models as encounter_models #noqa
+    from app.enrollment import models as enrollment_models #noqa
+    from app.jobs import models as job_models #noqa
 
     app.register_blueprint(enrollment_bp)
     app.register_blueprint(auth_bp)

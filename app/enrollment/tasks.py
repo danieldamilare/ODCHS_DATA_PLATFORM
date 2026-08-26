@@ -22,7 +22,7 @@ from app.enrollment.idcard.generator import IdCardGenerator, ProgressEvent
 
 from flask import current_app
 from app.enrollment.llm.clients import (
-    AllKeysExhausted,
+    RateLimitExceeded,
     gemini_client,
     ServerConnectionError,
 )
@@ -221,7 +221,7 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
         if is_batch:
             _finalize_image_processing(batch_name, batch_id, processed_form)
 
-    except AllKeysExhausted:
+    except RateLimitExceeded:
         traceback.print_exc()
         countdown = min(45 * (self.request.retries + 1), 5 * 60)
         raise self.retry(countdown=countdown)
@@ -243,21 +243,6 @@ def process_image_pipeline(self, form_id: str, is_batch=True):
             db.session.rollback()
         if is_batch and active_form:
             _finalize_image_processing(batch_name, batch_id, active_form)
-
-
-@celery_app.task(ignore_result=True)
-def reclaim_leased_api_keys():
-    from app.enrollment.llm.keys import KEY_POOL, LEASE, LEASE_TRACKER
-    from hashlib import md5
-
-    keys = kv.lrange(LEASE, 0, -1)
-    for key in keys:
-        key_hash = md5(key.encode()).hexdigest()
-        tracker_exist = kv.exists(f"{LEASE_TRACKER}:{key_hash}")
-        if not tracker_exist:
-            removed = kv.lrem(LEASE, 1, key)
-            if removed:
-                kv.rpush(KEY_POOL, key)
 
 
 @celery_app.task

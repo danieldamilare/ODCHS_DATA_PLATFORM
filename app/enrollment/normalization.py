@@ -2,7 +2,7 @@ from dateutil import parser, relativedelta
 from datetime import datetime
 from app.enrollment.dataloader import get_loader
 from typing import Dict, Optional
-from app.enrollment.models import Form, Batch
+from app.enrollment.models import Form
 from app.enrollment.schema import OCRResponse
 import re
 
@@ -16,6 +16,13 @@ def normalize_ng_phone(raw: str) -> Optional[str]:
     if digits.startswith("0") and len(digits) == 11:
         return f"+234{digits[1:]}"
     return None
+
+
+def clean_str(val: Optional[str]) -> Optional[str]:
+    if not val:
+        return None
+    cleaned = str(val).strip().title()
+    return cleaned if cleaned else None
 
 
 def compute_age(dob) -> int:
@@ -35,13 +42,13 @@ def normalize_category(category: Optional[str]) -> Optional[str]:
     if "preg" in cat:
         return "PREGNANT WOMEN"
     if "elder" in cat or "65" in cat:
-        return "AGED (65 yRS ABOVE)"
+        return "AGED (65 YRS ABOVE)"
     if "child" in cat or "under 5" in cat:
-        return "CHILDREN uNDER 5 yEARS"
+        return "CHILDREN UNDER 5 yEARS"
     if "disab" in cat:
         return "PEOPLE WITH DISABILITIES"
     if "widow" in cat:
-        return "WIDOW/wIDOWER"
+        return "WIDOW/WIDOWER"
     return None
 
 
@@ -79,25 +86,28 @@ def normalize_form_object(
 
     form.nin = res.nin
     form.gender = res.gender
-    form.address = str(res.address).capitalize()
-    form.occupation = str(res.occupation).capitalize()
+    form.address = clean_str(res.address)
+    form.occupation = clean_str(res.occupation)
     form.dob = res.dob
     form.phone_number = normalize_ng_phone(res.phone_number)
 
     form.lga_no = batch["lga_no"]
     form.facility_no = batch["facility_no"]
     form.ward_no = batch["ward_no"]
-    form.surname = res.surname.capitalize()
-    form.firstname = res.first_name.capitalize()
-    form.othername = res.other_name.capitalize()
+    form.surname = clean_str(res.surname)
+    form.firstname = clean_str(res.first_name)
+    form.othername = clean_str(res.other_name)
 
     if res.next_of_kin:
-        form.kin_firstname = res.next_of_kin.first_name
-        form.kin_othername = res.next_of_kin.other_name
-        form.kin_relationship = res.next_of_kin.relationship
-        form.kin_address = res.next_of_kin.address
+        form.kin_firstname = clean_str(res.next_of_kin.first_name)
+
+        form.kin_othername = clean_str(res.next_of_kin.other_name)
+        form.kin_relationship = clean_str(res.next_of_kin.relationship)
+
+        form.kin_address = clean_str(res.next_of_kin.address)
+
         form.kin_phone_number = normalize_ng_phone(res.next_of_kin.phone_number)
-        form.kin_surname = res.next_of_kin.surname
+        form.kin_surname = clean_str(res.next_of_kin.surname)
 
     title = process_title(
         form.gender, res.marital_status.value if res.marital_status else ""
@@ -115,7 +125,7 @@ def normalize_form_object(
             flagged_reasons.append("Date Format is incorrect, and cannot be parsed")
 
     category = normalize_category(res.category)
-    explicit_category = {"People with disabilities", "Widow/Widower", "Pregnant women"}
+    explicit_category = {"PEOPLE WITH DISABILITIES", "WIDOW/WIDOWER", "PREGNANT WOMEN"}
 
     if dob:
         if category not in explicit_category:
@@ -145,6 +155,9 @@ def normalize_form_object(
 
     if not form.kin_relationship:
         form.kin_relationship = "family"
+
+    if not form.kin_firstname and form.kin_othername:
+        form.kin_othername, form.kin_firstname = form.kin_firstname, form.kin_othername
 
     if form.lga_no:
         lga = loader.reverse_lga.get(str(form.lga_no))

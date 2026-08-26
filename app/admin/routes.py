@@ -59,7 +59,7 @@ def get_users():
 @admin_bp.post('/users/<string:user_id>/deactivate')
 def deactivate_user(user_id):
    resp =  AdminServices().deactivate_user(user_id)
-   if resp['success'] == False:
+   if not resp['success']:
        return jsonify(resp), 400
    return jsonify(resp)
 
@@ -81,7 +81,6 @@ def get_user_by_id(user_id):
 @admin_bp.post("/users/<string:user_id>/reactivate")
 def  reactivate_user(user_id):
     user = db.session.scalar(sa.select(User).filter_by(uuid=user_id))
-    msg = None
 
     if not user:
         return jsonify({"success": False, "msg": "User does not exist"}), 400

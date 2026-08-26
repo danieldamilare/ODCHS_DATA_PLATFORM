@@ -1,21 +1,35 @@
-from app.enrollment.llm.keys import get_key, release_key
+import os
+import json
+import traceback
+from time import perf_counter
+
+from google import genai
+from google.genai import types
+from pydantic import ValidationError
+from PIL import Image
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    retry_if_exception,
+    before_sleep_log,
+)
+import logging
+
 from app.enrollment.llm.prompt import SYSTEM_PROMPT
 from app.enrollment.schema import OCRResponse
-from google import genai
-from time import perf_counter
-from pydantic import ValidationError
-from google.genai import types
 from app import kv
-import json
+from flask import current_app
 
+logger = logging.getLogger(__name__)
 
-from PIL import Image
-import time
-import traceback
+GEMINI_CIRCUIT = "Gemini:circuit_breaker"
+CIRCUIT_BREAKER_SECONDS = 180
 
+MODEL_NAME = "gemini-3.5-flash"
 
-class AllKeysExhausted(Exception):
-    pass
+API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
 class LLMExtractionFailed(Exception):
@@ -26,22 +40,48 @@ class ServerConnectionError(Exception):
     pass
 
 
-GEMINI_CIRCUIT = "Gemini:circuit_breaker"
-MODEL_NAME = "gemini-3.5-flash"
+class RateLimitExceeded(Exception):
+    """Raised when retries are exhausted specifically due to 429/quota errors.
+    Distinct from LLMExtractionFailed so callers (e.g. the celery task) can
+    retry later instead of treating it as a permanent per-form failure."""
 
-SUCCESS_COOLDOWN_SECONDS = 10
-
-RATE_LIMIT_COOLDOWN_SECONDS = 70
-
-TRANSIENT_COOLDOWN_SECONDS = 10
+    pass
 
 
-def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
+def _is_transient(exc: BaseException) -> bool:
+    err_text = str(exc).lower()
+    return any(
+        s in err_text
+        for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection")
+    )
+
+
+def _is_rate_limited(exc: BaseException) -> bool:
+    err_text = str(exc).lower()
+    return "429" in err_text or "quota" in err_text or "rate limit" in err_text
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    return _is_transient(exc) or _is_rate_limited(exc)
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    retry=(
+        retry_if_exception_type(
+            (ValidationError, json.JSONDecodeError, LLMExtractionFailed)
+        )
+        | retry_if_exception(_is_retryable)
+    ),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def _call_gemini(image_path: str) -> OCRResponse:
     if kv.get(GEMINI_CIRCUIT):
         raise ServerConnectionError("Server is currently down. Gently waiting")
-    last_error = None
-    attempt = 0
 
+    client = genai.Client(api_key=current_app.config['GEMINI_API_KEY'])
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         temperature=0,
@@ -50,94 +90,39 @@ def gemini_client(image_path: str, max_retries: int = 4) -> OCRResponse:
         response_schema=OCRResponse,
     )
 
-    img = Image.open(image_path)
-    all_server_error_count = 0
+    with Image.open(image_path) as img:
+        t0 = perf_counter()
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[img, "Extract data from the image"],
+            config=config,
+        )
+        print(f"Gemini call took {perf_counter() - t0:.3f}s")
 
-    while attempt <= max_retries:
-        current_api_key = get_key()
+    if not response.text:
+        raise LLMExtractionFailed("Empty response text from Gemini")
 
-        if current_api_key is None:
-            raise AllKeysExhausted()
+    try:
+        return OCRResponse.model_validate_json(response.text)
+    except (ValidationError, json.JSONDecodeError):
+        raise
 
-        released = False
-        try:
-            client = genai.Client(api_key=current_api_key)
-            t0 = perf_counter()
-            response = client.models.generate_content(
-                model=MODEL_NAME,
-                contents=[img, "Extract data from the image"],
-                config=config,
-            )
-            print(f"Gemini call took {perf_counter() - t0:.3f}s")
 
-            release_key(
-                current_api_key, to_cool=True, cooldown_time=SUCCESS_COOLDOWN_SECONDS
-            )
-            released = True
+def gemini_client(image_path: str) -> OCRResponse:
+    try:
+        return _call_gemini(image_path)
+    except Exception as e:
+        err_text = str(e).lower()
 
-            if not response.text:
-                last_error = "Empty response text from Gemini"
-                attempt += 1
-                time.sleep(1)
-                continue
-            print(response.text)
+        if any(
+            s in err_text
+            for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection")
+        ):
+            kv.setex(GEMINI_CIRCUIT, CIRCUIT_BREAKER_SECONDS, "Server error")
+            raise ServerConnectionError(f"Gemini server is unstable: {e}") from e
 
-            try:
-                return OCRResponse.model_validate_json(response.text)
-            except (ValidationError, json.JSONDecodeError) as e:
-                last_error = e
-                attempt += 1
-                time.sleep(1)
-                continue
+        if "429" in err_text or "quota" in err_text or "rate limit" in err_text:
+            raise RateLimitExceeded(f"Rate limited after retries: {e}") from e
 
-        except Exception as e:
-            last_error = e
-            err_text = str(e).lower()
-
-            if "429" in err_text or "quota" in err_text or "rate limit" in err_text:
-                release_key(
-                    current_api_key,
-                    to_cool=True,
-                    cooldown_time=RATE_LIMIT_COOLDOWN_SECONDS,
-                )
-                released = True
-                time.sleep(1)
-                continue
-
-            elif any(
-                s in err_text
-                for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection")
-            ):
-                all_server_error_count += 1
-                release_key(
-                    current_api_key,
-                    to_cool=True,
-                    cooldown_time=TRANSIENT_COOLDOWN_SECONDS,
-                )
-                released = True
-                attempt += 1
-                time.sleep(2 ** (attempt + 1))
-                continue
-
-            else:
-                print("Unhandled Gemini error: ", e, traceback.format_exc())
-                release_key(
-                    current_api_key,
-                    to_cool=True,
-                    cooldown_time=TRANSIENT_COOLDOWN_SECONDS,
-                )
-                released = True
-                raise
-
-        finally:
-            if not released:
-                release_key(
-                    current_api_key,
-                    to_cool=True,
-                    cooldown_time=TRANSIENT_COOLDOWN_SECONDS,
-                )
-
-    if all_server_error_count > (max_retries * 0.60):
-        kv.setex(GEMINI_CIRCUIT, 360, "Server error")
-        raise ServerConnectionError("Gemini server is unstable")
-    raise LLMExtractionFailed(f"Max retries exceeded: {last_error}")
+        print("Gemini extraction failed: ", e, traceback.format_exc())
+        raise LLMExtractionFailed(f"Max retries exceeded: {e}") from e

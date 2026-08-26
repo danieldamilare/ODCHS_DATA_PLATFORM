@@ -6,7 +6,6 @@ from werkzeug.utils import secure_filename
 from app import celery_app
 import json
 import pandas as pd
-from flask import url_for
 from typing import Optional, Tuple, Dict
 import re
 from app import db

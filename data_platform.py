@@ -10,4 +10,3 @@ except ImportError:
     pass
 
 from app import app as app
-from app import app as app

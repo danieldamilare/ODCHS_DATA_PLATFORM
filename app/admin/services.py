@@ -1,4 +1,4 @@
-from app.auth.models import User, UserStatus, UserRole
+from app.auth.models import User, UserStatus
 from app.admin.schema import UserValidator 
 from app.core.tasks import send_email
 from app import db

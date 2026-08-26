@@ -35,6 +35,7 @@ class Config:
     RESEND_API_KEY = os.getenv("RESEND_API_KEY")
     FRONTEND_URL = os.getenv("FRONTEND_URL") or "http://localhost:5173"
     JWT_COOKIE_CSRF_PROTECT = False
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": 10,
@@ -81,13 +82,6 @@ class Config:
         "interval_max": 2.0,
     }
 
-    beat_schedule = {
-        "reclaim-leased-keys-every-5-mins": {
-            "task": "app.enrollment.tasks.reclaim_leased_api_keys",
-            "schedule": 60.0 * 5,
-        },
-    }
-
     task_routes = {
         "app.core.tasks.send_email": "io_bound",
         "app.encounter.tasks.finalize_encounter_analysis": "cpu_bound",
@@ -97,7 +91,6 @@ class Config:
         "app.enrollment.tasks.extract_zip_for_processing": "cpu_bound",
         "app.enrollment.tasks.generate_id_card": "cpu_bound",
         "app.enrollment.taks.get_his_id_card_payload": "io_bound",
-        "app.enrollment.tasks.reclaim_leased_api_keys": "io_bound",
         "app.enrollment.tasks.start_id_card_generate_job": "io_bound",
         "app.enrollment.tasks.process_image_pipeline": "io_bound",
         "app.nin_validation.tasks.finalize_nin_process": "io_bound",
