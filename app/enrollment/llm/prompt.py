@@ -10,12 +10,10 @@ SECTION 1: GENERAL RULES
 ═══════════════════════════════════════════
 SECTION 2: DATE FORMAT
 ═══════════════════════════════════════════
-- Dates of birth on these forms are not written in one  format —
+- Dates of birth on these forms are not written in either format —
   different forms use DD-MM-YYYY, YYYY-MM-DD, or a spelled-out month (e.g.
-  "13 Aug 2025"). Determine each date's actual format before converting;
-  do not assume it is already in MM-DD-YYYY order
-- Convert all dates of birth to MM-DD-YYYY using hyphens.
-- Example: 23-07-1990, July 23, 1970 on the form → return "07-23-1990"
+  "13 Aug 2025"). Always Convert dates of birth to MM-DD-YYYY using hyphens (IMPORTANT).
+- Example: 23-07-1990, July 23, 1990 on the form → return "07-23-1990"
 - If Date of Birth is missing or incomplete, set "dob": "".
 
 ═══════════════════════════════════════════
