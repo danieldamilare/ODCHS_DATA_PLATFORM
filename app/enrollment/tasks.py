@@ -167,7 +167,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
 
     desc, path = tempfile.mkstemp(suffix=".webp")
     os.close(desc)
-    cv2.imwrite(path, correct_form, [cv2.IMWRITE_WEBP_QUALITY, 75])
+    cv2.imwrite(path, correct_form, [cv2.IMWRITE_WEBP_QUALITY, 90])
     
     base, _ = os.path.splitext(form.img_path)
     new_img_path = base + ".webp"
