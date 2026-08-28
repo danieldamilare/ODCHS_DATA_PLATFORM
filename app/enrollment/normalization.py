@@ -15,6 +15,8 @@ def normalize_ng_phone(raw: str) -> Optional[str]:
         return f"+{digits}"
     if digits.startswith("0") and len(digits) == 11:
         return f"+234{digits[1:]}"
+    if len(digits) == 10 and digits[0] != "0":
+        return f"+234{digits}"
     return None
 
 

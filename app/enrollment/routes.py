@@ -675,29 +675,32 @@ def download_form_idcard(form_id: str):
         return (jsonify({"success": False, "msg": "Invalid download type"}), 400)
 
 
+CACHE_1_YEAR = 60 * 60 * 24 * 365
+CACHE_90_DAYS = 60 * 60 * 24 * 90
+
 @enrollment_bp.get("/lgas")
 def get_lgas():
     loader = get_loader()
     lga = loader.lgas or {}
-    return jsonify([{"id": code, "name": name} for name, code in lga.items()])
+    return jsonify([{"id": code, "name": name} for name, code in lga.items()]), 200, {"Cache-Control":  f"public, max-age={CACHE_1_YEAR}"}
 
 
 @enrollment_bp.route("/wards/<int:lga_id>")
 def get_wards(lga_id):
     loader = get_loader()
     wards = loader.wards.get(str(lga_id), {})
-    return jsonify([{"id": code, "name": name} for name, code in wards.items()])
+    return jsonify([{"id": code, "name": name} for name, code in wards.items()]), 200, {"Cache-Control":  f"public, max-age={CACHE_1_YEAR}"}
 
 
 @enrollment_bp.route("/facilities/<int:ward_id>")
 def get_facilities(ward_id):
     loader = get_loader()
     facilities = loader.facilities.get(str(ward_id), {})
-    return jsonify([{"id": code, "name": name} for name, code in facilities.items()])
-
+    return jsonify([{"id": code, "name": name} for name, code in facilities.items()]), {"Cache-Control":  f"public, max-age={CACHE_90_DAYS}"}
+ 
 
 @enrollment_bp.route("/categories")
 def get_categories():
     loader = get_loader()
     citizen_types = loader.citizen_types or {}
-    return jsonify([{"id": code, "name": name} for name, code in citizen_types.items()])
+    return jsonify([{"id": code, "name": name} for name, code in citizen_types.items()]), {"Cache-Control":  f"public, max-age={CACHE_90_DAYS}"}
