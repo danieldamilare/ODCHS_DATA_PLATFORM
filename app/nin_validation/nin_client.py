@@ -310,7 +310,7 @@ class NINClient:
         return to_process
 
 
-    def validate_nin(self, dob: date, nin: str, check_date_ambiguity=False) -> NINValidationResult:
+    def validate_nin(self, dob: date, nin: str, check_date_ambiguity=True) -> NINValidationResult:
         dob_str = dob.strftime("%d/%m/%Y")
         key = f"nin:verified:{nin}:{dob_str}"
         if payload := self.kv.get(key):
