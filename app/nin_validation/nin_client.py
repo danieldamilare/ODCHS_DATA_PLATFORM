@@ -311,7 +311,8 @@ class NINClient:
 
 
     def validate_nin(self, dob: date, nin: str, check_date_ambiguity=False) -> NINValidationResult:
-        key = f"nin:verified:{nin}"
+        dob_str = dob.strftime("%d/%m/%Y")
+        key = f"nin:verified:{nin}:{dob_str}"
         if payload := self.kv.get(key):
             result = json.loads(payload)
             return NINValidationResult(
@@ -328,11 +329,12 @@ class NINClient:
             had_sys_error = False
 
             for payload in to_process:
+                key = f"nin:verified:{payload['nin']}:{payload['dateOfBirth']}"
                 try:
                     result = self.post_request(self.nin_validate_url, json_data=payload)
                     if result.get("responseCode", 0) == 200:
-                        payload = json.dumps(result)
-                        kv.set(key, payload)
+                        data = json.dumps(result)
+                        kv.set(key, data)
                         kv.expire(key, time=3600 * 6)
                         return NINValidationResult(
                             True,
