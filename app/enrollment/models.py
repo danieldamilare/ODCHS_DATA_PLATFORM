@@ -22,6 +22,14 @@ class FormStatus(Enum):
     ERROR = "error"
     ALREADY_EXIST = "already_exist"
 
+class ODCHCScheme(str, Enum):
+    BHCPFP = "bhcpfp"
+    ORANGHIS = "oranghis"
+    ABIYAMO = "abiyamo"
+
+class SchemeSectors(str, Enum):
+    INFORMAL = "informal"
+    FORMAL = "formal"
 
 class Batch(db.Model):
     __tablename__ = "batches"
@@ -44,6 +52,10 @@ class Batch(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    
+    # new scheme and sector enum
+    scheme = db.Column(db.Enum(ODCHCScheme), default=ODCHCScheme.BHCPFP, nullable=False)
+    sector = db.Column(db.Enum(SchemeSectors), nullable=True)
 
     def to_dict(self):
         loader = get_loader()
@@ -118,6 +130,13 @@ class Form(db.Model):
     settlement = db.Column(db.String(5), nullable=True)
     category = db.Column(db.Integer, nullable=True)
     marital_status = db.Column(db.String(15), nullable=True)
+    
+    enployment_id = db.Column(db.String(11), nullable=True)
+    ext_aliment = db.Column(db.String, nullable=True) # existing ailment
+    present_mda = db.Column(db.String, nullable=True)
+    department = db.Column(db.String, nullable=True)
+    cadre = db.Column(db.String, nullable=True)
+     
 
     batch_id = db.Column(
         db.Integer,
@@ -131,6 +150,10 @@ class Form(db.Model):
     enrollee_number = db.Column(db.String, nullable=True, index=True)
     genotype = db.Column(db.String(3), nullable=True)
     medical_history = db.Column(db.Text, nullable=True)
+    
+    # new scheme and sector enum
+    scheme = db.Column(db.Enum(ODCHCScheme), default=ODCHCScheme.BHCPFP, nullable=False)
+    sector = db.Column(db.Enum(SchemeSectors), nullable=True)
 
     # Sickle cell people are treated seperately, later we would add a way to identify them.
     # The HIS Site doesn't disaggregrate, but it allows a medical history list, we can pass sickle cell
@@ -169,6 +192,8 @@ class Form(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    dependants = db.relationship("Dependants", back_populates="form")
+    
     def to_dict(self):
         loader = get_loader()
         img_path = url_for(
@@ -232,4 +257,52 @@ class Form(db.Model):
                 "xmax": self.passport_xmax,
                 "ymax": self.passport_ymax,
             },
+            "dependants":[{
+                "id": dpd.uuid,
+                "passport_path": dpd.passport_path,
+                "sequence": dpd.sequence,
+                "name": dpd.dpd_name, 
+                "dob": dpd.dpd_dob,
+                "gender": dpd.dpd_gender,
+                "lga": (loader.reverse_lga or {}).get(str(dpd.lga_no),None),
+                "facility": (loader.reverse_facility or {}).get(str(dpd.facility_no),None),
+                "lga_no": dpd.dpd_lga_no,
+                "facility_no": dpd.dpd_facility_no,
+                "medical_history": dpd.dpd_medical_history,
+                "phone_number": dpd.dpd_phone_number,
+                "passport_coord": {
+                    "xmin": self.passport_xmin,
+                    "ymin": self.passport_ymin,
+                    "xmax": self.passport_xmax,
+                    "ymax": self.passport_ymax,
+                },
+            } for dpd in self.dependants]
         }
+
+class Dependants(db.Model):
+    __tablename__ = "dependants"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    sequence = db.Column(db.Integer, index=True)
+    uuid = db.Column(db.String, unique=True, default=lambda: str(uuid_tool.uuid4()))
+    passport_path = db.Column(db.Text, nullable=True)
+    form_id = db.Column(db.String, db.ForeignKey('forms.uuid'), nullable=False)
+    
+    # dependant of the enrollee - min 4
+    dpd_name = db.Column(db.String, nullable=True)
+    dpd_dob = db.Column(db.String, nullable=True)
+    dpd_gender = db.Column(db.String(6), nullable=True)
+    dpd_lga_no = db.Column(db.Integer, nullable=True)
+    dpd_facility_no = db.Column(db.Integer, nullable=True)
+    dpd_medical_history = db.Column(db.Text, nullable=True)
+    dpd_phone_number = db.Column(db.String, nullable=True)
+    
+    passport_xmin = db.Column(db.Integer, nullable=True)
+    passport_ymin = db.Column(db.Integer, nullable=True)
+    passport_xmax = db.Column(db.Integer, nullable=True)
+    passport_ymax = db.Column(db.Integer, nullable=True)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    
+    form = db.relationship("Form", back_populates="forms")
