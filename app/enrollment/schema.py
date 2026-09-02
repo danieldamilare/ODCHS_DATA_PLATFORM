@@ -160,3 +160,45 @@ class FormUpdater(BaseModel):
 
     def get_updates(self) -> dict:
         return {k: v for k, v in self.model_dump().items() if v is not None}
+    
+class DependantsUpdater(BaseModel):
+    sequence: int
+    form_id: str
+    dpd_name: str
+    dpd_dob: str
+    dpd_gender: Literal["Male", "Female"]
+    dpd_phone_number: str
+    dpd_medical_history: int
+    dpd_lga_no: int
+    dpd_facility_no: int
+    passport_xmin: Optional[int] = None
+    passport_ymin: Optional[int] = None
+    passport_xmax: Optional[int] = None
+    passport_ymax: Optional[int] = None
+    passport_path: Optional[str] = None
+    use_avatar: Optional[bool] = False
+    rotate_angle: Optional[int] = None
+
+    @field_validator("dpd_phone_number")
+    @classmethod
+    def validate_dpd_phone_number(cls, dpd_phone_number: str):
+        # frontend always provide leading prefix
+        if not dpd_phone_number.startswith("+234"):
+            raise ValueError("Invalid Phone number: Phone number must starts with +234")
+        if not dpd_phone_number[1:].isdigit():
+            raise ValueError("Phone number must all be digit")
+        if len(dpd_phone_number) != 14:
+            raise ValueError("Incomplete Phone number")
+        return dpd_phone_number
+
+    @field_validator("rotate_angle")
+    @classmethod
+    def validate_rotate_angle(cls, rotate_angle: Optional[int]):
+        if rotate_angle is None:
+            return rotate_angle
+        if rotate_angle not in (90, 180, 270):
+            raise ValueError("Invalid rotation angle")
+        return rotate_angle
+
+    def get_updates(self) -> dict:
+        return {k: v for k, v in self.model_dump().items() if v is not None}

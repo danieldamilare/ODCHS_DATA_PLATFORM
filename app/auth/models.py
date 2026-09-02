@@ -18,6 +18,10 @@ class UserStatus(str, Enum):
     PENDING = "pending"
     DEACTIVATED = "deactivated"
 
+class ODCHCScheme(str, Enum):
+    BHCPFP = "bhcpfp"
+    ORANGHIS = "oranghis"
+    ABIYAMO = "abiyamo"
 
 class User(db.Model):
     __tablename__ = "user"
@@ -36,6 +40,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=True)
     status = db.Column(db.Enum(UserStatus), default=UserStatus.PENDING, nullable=False)
     role = db.Column(db.Enum(UserRole), default=UserRole.USER, nullable=False)
+    scheme = db.Column(db.Enum(ODCHCScheme), default=ODCHCScheme.BHCPFP, nullable=False)
 
     expiry_date = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(
