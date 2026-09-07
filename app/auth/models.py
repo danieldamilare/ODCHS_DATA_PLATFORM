@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
+from app.enrollment.models import ODCHCScheme
 
 
 class UserRole(str, Enum):
@@ -17,7 +18,6 @@ class UserStatus(str, Enum):
     ACTIVE = "active"
     PENDING = "pending"
     DEACTIVATED = "deactivated"
-
 
 class User(db.Model):
     __tablename__ = "user"
@@ -36,6 +36,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=True)
     status = db.Column(db.Enum(UserStatus), default=UserStatus.PENDING, nullable=False)
     role = db.Column(db.Enum(UserRole), default=UserRole.USER, nullable=False)
+    scheme = db.Column(db.Enum(ODCHCScheme), default=ODCHCScheme.BHCPFP, nullable=False)
 
     expiry_date = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(
@@ -54,6 +55,7 @@ class User(db.Model):
             "email": self.email,
             "status": self.status.value if self.status else None,
             "role": self.role.value if self.role else None,
+            "scheme": self.scheme,
             "expiry_date": self.expiry_date.isoformat() if self.expiry_date else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None,
