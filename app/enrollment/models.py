@@ -26,10 +26,7 @@ class ODCHCScheme(str, Enum):
     BHCPFP = "bhcpfp"
     ORANGHIS = "oranghis"
     ABIYAMO = "abiyamo"
-
-class SchemeSectors(str, Enum):
-    INFORMAL = "informal"
-    FORMAL = "formal"
+    SUNSHIS= "sunshis"
 
 class Batch(db.Model):
     __tablename__ = "batches"
@@ -55,7 +52,6 @@ class Batch(db.Model):
     
     # new scheme and sector enum
     scheme = db.Column(db.Enum(ODCHCScheme), default=ODCHCScheme.BHCPFP, nullable=False)
-    sector = db.Column(db.Enum(SchemeSectors), nullable=True)
 
     def to_dict(self):
         loader = get_loader()
@@ -63,12 +59,13 @@ class Batch(db.Model):
             "id": self.uuid,
             "total": self.total,
             "status": self.status.value,
-            "plan": "BHCPFP",
+            "plan": self.scheme.value,
             "name": self.name,
             "state": "Ondo State",
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
+            "scheme": self.scheme.value,
             "lga": (loader.reverse_lga or {}).get(str(self.lga_no)),
             "ward": (loader.reverse_ward or {}).get(str(self.ward_no)),
             "facility": (loader.reverse_facility or {}).get(str(self.facility_no)),
@@ -109,6 +106,7 @@ class Form(db.Model):
         "ward_no",
         "genotype",
         "occupation",
+        "scheme",
         "medical_history",
         "facility_no",
         "passport_path",
@@ -153,7 +151,6 @@ class Form(db.Model):
     
     # new scheme and sector enum
     scheme = db.Column(db.Enum(ODCHCScheme), default=ODCHCScheme.BHCPFP, nullable=False)
-    sector = db.Column(db.Enum(SchemeSectors), nullable=True)
 
     # Sickle cell people are treated seperately, later we would add a way to identify them.
     # The HIS Site doesn't disaggregrate, but it allows a medical history list, we can pass sickle cell
@@ -192,7 +189,7 @@ class Form(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    dependants = db.relationship("Dependants", back_populates="form")
+    dependants = db.relationship("Dependants", back_populates="form", cascade="all, delete-orphan")
     
     def to_dict(self):
         loader = get_loader()
@@ -237,6 +234,7 @@ class Form(db.Model):
             "lga_no": self.lga_no,
             "ward_no": self.ward_no,
             "facility_no": self.facility_no,
+            "scheme": self.scheme.value,
             "genotype": self.genotype,
             "medical_history": self.medical_history,
             "flagged": self.flagged,
@@ -271,10 +269,10 @@ class Form(db.Model):
                 "medical_history": dpd.dpd_medical_history,
                 "phone_number": dpd.dpd_phone_number,
                 "passport_coord": {
-                    "xmin": self.passport_xmin,
-                    "ymin": self.passport_ymin,
-                    "xmax": self.passport_xmax,
-                    "ymax": self.passport_ymax,
+                    "xmin": dpd.passport_xmin,
+                    "ymin": dpd.passport_ymin,
+                    "xmax": dpd.passport_xmax,
+                    "ymax": dpd.passport_ymax,
                 },
             } for dpd in self.dependants]
         }
@@ -305,4 +303,4 @@ class Dependants(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     
-    form = db.relationship("Form", back_populates="forms")
+    form = db.relationship("Form", back_populates="dependants")

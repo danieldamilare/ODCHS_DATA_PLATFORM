@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict, model_valida
 from werkzeug.datastructures import FileStorage
 from app.core.utils import validate_zip_file
 from app.enrollment.utils import is_image_extension
+from app.enrollment.models import ODCHCScheme
 from app.nin_validation.nin_client import load_nin_client
 from dateutil import parser
 
@@ -69,6 +70,7 @@ class BatchUploader(BaseModel):
     facility_no: Optional[int] = None
     name: str = ""
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    scheme: ODCHCScheme
 
     @field_validator("batch_file")
     @classmethod
@@ -116,6 +118,7 @@ class FormUpdater(BaseModel):
     lga_no: int
     ward_no: int
     facility_no: int
+    scheme: ODCHCScheme
     passport_path: Optional[str] = None
     use_avatar: Optional[bool] = False
     rotate_angle: Optional[int] = None
@@ -168,7 +171,7 @@ class DependantsUpdater(BaseModel):
     dpd_dob: str
     dpd_gender: Literal["Male", "Female"]
     dpd_phone_number: str
-    dpd_medical_history: int
+    dpd_medical_history: str
     dpd_lga_no: int
     dpd_facility_no: int
     passport_xmin: Optional[int] = None
