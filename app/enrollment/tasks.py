@@ -83,6 +83,7 @@ def extract_zip_for_processing(path: str, batch_id: str):
                     batch_id=batch.id,
                     sequence=idx + 1,
                     status=FormStatus.PENDING,
+                    scheme=batch.scheme
                 )
                 print("Created new form: ", new_form)
                 db.session.add(new_form)

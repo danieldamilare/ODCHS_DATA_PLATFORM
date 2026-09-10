@@ -70,7 +70,6 @@ class BatchUploader(BaseModel):
     facility_no: Optional[int] = None
     name: str = ""
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    scheme: ODCHCScheme
 
     @field_validator("batch_file")
     @classmethod

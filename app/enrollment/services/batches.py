@@ -49,7 +49,7 @@ class BatchIdCardDownloadResult:
 
 class BatchServices:
     def create_job(
-        self, lga_no, ward_no, facility_no, file: FileStorage, name
+        self, lga_no, ward_no, facility_no, file: FileStorage, name, scheme
     ) -> BatchJobResult:
         loader = get_loader()
         file_hash = compute_hash(file)
@@ -93,6 +93,7 @@ class BatchServices:
             facility_no=facility_no,
             zip_hash=file_hash,
             total=len(images),
+            scheme=scheme
         )
 
         db.session.add(batch)
