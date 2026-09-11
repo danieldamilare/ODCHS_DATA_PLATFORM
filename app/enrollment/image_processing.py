@@ -1,6 +1,8 @@
 import cv2
 import os
 
+from app.enrollment.models import ODCHCScheme
+
 
 YUNET_MODEL_PATH = os.path.join(
     os.path.dirname(__file__), "face_detection_yunet_2026may.onnx"
@@ -77,7 +79,7 @@ def generate_crop_dimension_from_face(face_area, scale_factor, margin, h_img, w_
     return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
 
 
-def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=None):
+def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=None, form_scheme:ODCHCScheme=None):
     print("About to start reading image")
 
     img = read_image(img_path_or_matrix)
@@ -101,6 +103,11 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
         score_threshold=0.40,
         nms_threshold=0.20,
     )
+    MAX_FACES = 1
+    if form_scheme == ODCHCScheme.SUNSHIS:
+        MAX_FACES = 5
+    elif form_scheme == ODCHCScheme.ORANGHIS:
+        MAX_FACES = 1
 
     for img in img_approx:
 
@@ -114,12 +121,27 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
 
             if faces is None or len(faces) == 0:
                 continue
-            face_area = faces[0]
-            result = generate_crop_dimension_from_face(
-                face_area, scale_factor, margin, h, w
-            )
-            if (result["y2"] + result["y1"]) / 2 < h * 0.45:
-                return img, result
+            faces_sorted = faces[faces[:, -1].argsort()[::-1]]
+            top_faces = faces_sorted[:MAX_FACES]
+
+            results = []
+            for face_area in top_faces:
+                result = generate_crop_dimension_from_face(
+                    face_area, scale_factor, margin, h, w
+                )
+                results.append(result)
+
+            if MAX_FACES == 1:
+                result = results[0]
+                if (result["y2"] + result["y1"]) / 2 < h * 0.45:
+                    return img, result
+            else:
+                valid = [
+                    r for r in results
+                    if (r["y2"] + r["y1"]) / 2 < h * 0.45
+                ]
+                if valid:
+                    return img, valid
         except Exception as e:
             if logger:
                 logger.info(f"Encounter error on image: {e}")

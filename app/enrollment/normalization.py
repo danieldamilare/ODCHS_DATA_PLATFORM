@@ -76,7 +76,7 @@ def process_title(gender: str, marital_status: str) -> str:
 
 
 def normalize_form_object(
-    form: Form, batch: Dict, res: OCRResponse, coords: Dict
+    form: Form, batch: Dict, res: OCRResponse, coords: Dict|list
 ) -> Form:
     flagged_reasons = []
 

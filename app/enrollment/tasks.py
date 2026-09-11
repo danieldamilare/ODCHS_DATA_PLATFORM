@@ -145,8 +145,8 @@ def _finalize_image_processing(batch_name: str, batch_id: str, form: Form):
     kv.publish(channel, json.dumps(status_payload))
 
 
-def llm_extract(img_path):
-    return gemini_client(img_path)
+def llm_extract(img_path, scheme):
+    return gemini_client(img_path, scheme)
 
 
 def _process_image_pipeline(form: Form, batch: Batch):
@@ -163,7 +163,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
     print(f"blur: {perf_counter() - t0:.3f}s")
 
     t0 = perf_counter()
-    correct_form, coords = process_form_orientation_and_crop(image_matrix)
+    correct_form, coords = process_form_orientation_and_crop(image_matrix, form_scheme=form.scheme)
     print(f"yunet crop and orientation correction: {perf_counter() - t0:.3f}s")
 
     desc, path = tempfile.mkstemp(suffix=".webp")
@@ -192,7 +192,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
     db.session.remove()
 
     t0 = perf_counter()
-    res = llm_extract(new_img_path)
+    res = llm_extract(new_img_path, form.scheme)
     print(f"gemini: {perf_counter() - t0:.3f}s")
 
     form = db.session.scalar(sa.select(Form).where(Form.uuid == form_uuid))
