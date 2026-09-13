@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
 from werkzeug.datastructures import FileStorage
 from app.core.utils import validate_zip_file
@@ -29,6 +29,14 @@ class NextOfKin(BaseModel):
     phone_number: str = ""
     address: str = ""
 
+class Dependants(BaseModel):
+    name: str = ""
+    dob: str = ""
+    phone_number: str = ""
+    gender: Optional[Gender] = None
+    preferred_hospital: str = ""
+    existing_ailment: str = ""
+
 class OCRResponse(BaseModel):
     surname: str = Field(default="", description="Enrollee surname/last name. Empty string if blank.")
     first_name: str = Field(default="", description="Enrollee first name. Empty string if blank.")
@@ -50,6 +58,16 @@ class OCRResponse(BaseModel):
     )
     nin: str = Field(default="", description="The written National Identity Number. Empty string if blank.")
     next_of_kin: Optional[NextOfKin] = None
+
+    # additional response for formal form
+    existing_ailment: str = Field(default="", description="Enrollee Existing ailment. Empty sting value is blank or not exists on form")
+    preferred_hospital: str = Field(defailt="", description="Enrollee Choosen preferred hospital, this is related tot eh local govertment area selected. Empty string value if blank or not exists on form")
+    employment_id: str = Field(default="", description="Enrollee employment id. Empty sting value is blank or not exists on form")
+    present_mda: str = Field(default="", description="Enrollee present MDA. Empty sting value is blank or not exists on form")
+    department: str = Field(default="", description="Enrollee present MDA. Empty sting value is blank or not exists on form")
+
+    dependants: Optional[List[Dependants]] = None
+
 
     @field_validator("surname", "first_name", "other_name", mode="after")
     @classmethod

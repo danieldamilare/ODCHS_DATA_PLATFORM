@@ -35,4 +35,15 @@ SECTION 4: NAME TRANSLATION
 ═══════════════════════════════════════════
 - Name transcription: Nigerian given names and surnames are typically single unbroken words (e.g. "Akinyele", "Oluwaseun"). Do not insert a space in the middle of a name unless there is a clear, unambiguous gap in the handwriting. If a trailing letter is unclear, include it as part of the name rather than treating it as a separate initial.
  - Match schema to position in the form, (e.g surname text in form go to the surname in the schema )
+
+═══════════════════════════════════════════
+For dependant information:
+═══════════════════════════════════════════
+- Extract EVERY dependant row visible on the form.
+- Return each dependant as a separate object in the dependants array.
+- Do not merge multiple dependant rows into one object.
+- Preserve the order in which dependants appear on the form.
+- If there are no dependants or the dependant section is blank, return an empty array [].
+- For an individual dependant field that is blank or unreadable, return its default empty value.
+- Do not invent dependant information.
 """
