@@ -61,10 +61,11 @@ class OCRResponse(BaseModel):
 
     # additional response for formal form
     existing_ailment: str = Field(default="", description="Enrollee Existing ailment. Empty sting value is blank or not exists on form")
-    preferred_hospital: str = Field(defailt="", description="Enrollee Choosen preferred hospital, this is related tot eh local govertment area selected. Empty string value if blank or not exists on form")
+    preferred_hospital: str = Field(default="", description="Enrollee Choosen preferred hospital, this is related tot eh local govertment area selected. Empty string value if blank or not exists on form")
     employment_id: str = Field(default="", description="Enrollee employment id. Empty sting value is blank or not exists on form")
     present_mda: str = Field(default="", description="Enrollee present MDA. Empty sting value is blank or not exists on form")
     department: str = Field(default="", description="Enrollee present MDA. Empty sting value is blank or not exists on form")
+    cadre: str = Field(default="", description="Enrollee Cadrre. Empty sting value is blank or not exists on form")
 
     dependants: Optional[List[Dependants]] = None
 

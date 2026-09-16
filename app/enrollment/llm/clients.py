@@ -109,7 +109,7 @@ def _call_gemini(image_path: str) -> OCRResponse:
         raise
 
 
-def gemini_client(image_path: str, scheme:str) -> OCRResponse:
+def gemini_client(image_path: str) -> OCRResponse:
     if kv.get(GEMINI_CIRCUIT):
         raise ServerConnectionError("Server is currently down. Gently waiting")
     try:

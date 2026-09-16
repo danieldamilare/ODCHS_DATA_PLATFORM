@@ -110,7 +110,6 @@ class Form(db.Model):
         "medical_history",
         "facility_no",
         "passport_path",
-        "scheme"
     }
 
     id = db.Column(db.Integer, primary_key=True)
