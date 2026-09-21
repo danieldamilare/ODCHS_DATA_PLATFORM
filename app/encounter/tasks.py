@@ -382,7 +382,7 @@ def start_encounter_analysis(job_id, job_num):
     completed = int(kv.hget(job_key, "completed") or 0)
 
     publish_payload = {
-        "type": "done_analysing",
+        "type": "start_analysis",
         "status": "analysing",
         "job_num": job_num,
         "file": os.path.basename(path),
@@ -390,22 +390,26 @@ def start_encounter_analysis(job_id, job_num):
         "total": total,
     }
 
-    result = load_clean_dataframe(path, metadata)
-    facility, encounter_df, utilization_df = None, None, None
+    try: 
+        result = load_clean_dataframe(path, metadata)
+        facility, encounter_df, utilization_df = None, None, None
 
-    if result.success:
-        master_diagnosis_list = load_diagnosis_lines()
-        facility, encounter_df, utilization_df = process_df(result.data, master_diagnosis_list)
-        encounter_path = _construct_path(job_id, job_num, "encounter.parquet")
-        utilization_path = _construct_path(job_id, job_num, "utilization.parquet")
-        encounter_df.to_parquet(encounter_path)
-        utilization_df.to_parquet(utilization_path)
-        entry = {
-            "facility": facility,
-            "encounter_path": encounter_path,
-            "utilization_path": utilization_path,
-        }
-    else:
+        if result.success:
+            master_diagnosis_list = load_diagnosis_lines()
+            facility, encounter_df, utilization_df = process_df(result.data, master_diagnosis_list)
+            encounter_path = _construct_path(job_id, job_num, "encounter.parquet")
+            utilization_path = _construct_path(job_id, job_num, "utilization.parquet")
+            encounter_df.to_parquet(encounter_path)
+            utilization_df.to_parquet(utilization_path)
+            entry = {
+                "facility": facility,
+                "encounter_path": encounter_path,
+                "utilization_path": utilization_path,
+            }
+        else:
+            entry = {"failed": True, "file": os.path.basename(path)}
+    except Exception as e:
+        print(str(e))
         entry = {"failed": True, "file": os.path.basename(path)}
     kv.hset(EncounterKeys.get_results_key(job_id), str(job_num), json.dumps(entry))
 

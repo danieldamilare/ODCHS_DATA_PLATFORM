@@ -47,21 +47,24 @@ def merge_spilled_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
     primary = df["client_name"].map(is_valid)
     group_id = primary.astype(int).cumsum()
 
-    df = df[group_id > 0].copy()
-    group_id = group_id[group_id > 0]
+    valid_group_mask = group_id > 0
+    if not valid_group_mask.any():
+        return df.iloc[0:0].copy()
+
+    df = df[valid_group_mask].copy().reset_index(drop=True)
+    primary = primary[valid_group_mask].reset_index(drop=True)
+    group_id = group_id[valid_group_mask].reset_index(drop=True)
 
     valid_diag_mask = df["diagnosis"].map(is_valid)
-
+    
     merged_diag = (
         df[valid_diag_mask]
         .groupby(group_id[valid_diag_mask])["diagnosis"]
         .apply(" ".join)
     )
 
-    is_primary_row = primary[group_id > 0]
-    result = df[is_primary_row].copy().reset_index(drop=True)
-
-    primary_group_ids = group_id[is_primary_row].values
+    result = df[primary].copy().reset_index(drop=True)
+    primary_group_ids = group_id[primary].values
     result["diagnosis"] = [merged_diag.get(gid, "") for gid in primary_group_ids]
     result.reset_index(drop=True, inplace=True)
     result = result[result["diagnosis"].map(is_valid)]
@@ -135,6 +138,8 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
 
         df.dropna(axis=0, how="all", inplace=True)
         columns = list(df.columns)
+        print("columns", columns)
+        print("metadata[col]", metadata["col"])
 
         for key, value in metadata["col"].items():
             columns[int(value)] = key
@@ -143,9 +148,10 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
             re.sub(r"[^a-z0-9]", "_", col.lower().strip().replace(" ", "_"))
             for col in columns
         ]
+        print(columns)
+
         df.columns = columns
         df["facility"] = facility_name
-        df.dropna(axis=1, how="all", inplace=True)
         df = merge_spilled_diagnosis(df)
 
         needed_column = ["policy_number", "age", "sex", "diagnosis", "client_name"]
@@ -171,7 +177,7 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         to_find.reset_index(drop=True, inplace=True)
 
         missing_count = len(to_find)
-        policy_numbers = to_find["policy_number"].tolist()
+        policy_numbers = to_find[to_find["policy_number"].notna()]["policy_number"].tolist()
         found_count = 0
         if not to_find.empty:
             with ThreadPoolExecutor(max_workers=20) as executor:
