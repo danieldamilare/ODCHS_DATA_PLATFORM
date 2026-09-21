@@ -47,7 +47,7 @@ def downscale_image(img, target_width=1200):
     return img_low_res, scale_factor
 
 
-def is_image_too_blurry(image_path_or_matrix, threshold=200.0, logger=None):
+def is_image_too_blurry(image_path_or_matrix, threshold=100.0, logger=None):
     img = read_image(image_path_or_matrix)
     img, _ = downscale_image(img)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
