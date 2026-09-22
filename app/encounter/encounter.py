@@ -56,7 +56,7 @@ def merge_spilled_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
     group_id = group_id[valid_group_mask].reset_index(drop=True)
 
     valid_diag_mask = df["diagnosis"].map(is_valid)
-    
+
     merged_diag = (
         df[valid_diag_mask]
         .groupby(group_id[valid_diag_mask])["diagnosis"]
@@ -177,20 +177,26 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         to_find.reset_index(drop=True, inplace=True)
 
         missing_count = len(to_find)
-        policy_numbers = to_find[to_find["policy_number"].notna()]["policy_number"].tolist()
+        has_policy = (
+            to_find[to_find["policy_number"].notna()]["policy_number"]
+            .copy()
+            .reset_index(drop=True)
+        )
         found_count = 0
-        if not to_find.empty:
+
+        if not has_policy.empty:
+            policy_numbers = has_policy["policy_number"].tolist()
             with ThreadPoolExecutor(max_workers=20) as executor:
                 client = HISClient()
-                result = executor.map(
+                results = executor.map(
                     client.fetch_enrollee_details, policy_numbers
                 )  # map retains order
 
-                for idx, res in enumerate(result):
+                for idx, res in enumerate(results):
                     if res is None:
                         continue
                     found_count += 1
-                    s_n = to_find.loc[idx, "s/n"]
+                    s_n = has_policy.loc[idx, "s/n"]  # Matched 1:1 with policy_numbers
                     df.loc[df["s/n"] == s_n, "age_numeric"] = res.age
                     gender_clean = (
                         "Female" if "f" in str(res.gender).lower() else "Male"
@@ -264,7 +270,10 @@ def process_df(df: pd.DataFrame, master_diagnosis_list):
         enc_table.index.name = "Facility"
         enc_table = enc_table.reindex(columns=all_cols, fill_value=np.nan)
         classified = classify_diagnosis(df["diagnosis"].tolist())
-        df["classified_diagnosis"] = classified
+        df["classified_diagnosis"] = [
+            diag if (isinstance(diag, list) and len(diag) > 0) else ["OTHERS"]
+            for diag in classified
+        ]
         df = df.explode("classified_diagnosis").reset_index(drop=True)
         df["diagnosis"] = df["classified_diagnosis"]
         facility = df["facility"].iloc[0]
