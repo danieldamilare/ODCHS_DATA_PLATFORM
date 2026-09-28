@@ -161,7 +161,6 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         df["s/n"] = range(1, len(df) + 1)  # use to mark index for us later to value
 
         if df.empty:
-
             return DataFrameProcessResult(
                 success=False, err_msg=f"{file_path} is empty."
             )
@@ -177,31 +176,33 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         to_find.reset_index(drop=True, inplace=True)
 
         missing_count = len(to_find)
+
         has_policy = (
-            to_find[to_find["policy_number"].notna()]["policy_number"]
-            .copy()
+            to_find.loc[to_find["policy_number"].notna(), ["s/n", "policy_number"]]
             .reset_index(drop=True)
         )
         found_count = 0
 
         if not has_policy.empty:
-            policy_numbers = has_policy["policy_number"].tolist()
-            with ThreadPoolExecutor(max_workers=20) as executor:
-                client = HISClient()
-                results = executor.map(
-                    client.fetch_enrollee_details, policy_numbers
-                )  # map retains order
+            client = HISClient()
 
-                for idx, res in enumerate(results):
-                    if res is None:
-                        continue
-                    found_count += 1
-                    s_n = has_policy.loc[idx, "s/n"]  # Matched 1:1 with policy_numbers
-                    df.loc[df["s/n"] == s_n, "age_numeric"] = res.age
-                    gender_clean = (
-                        "Female" if "f" in str(res.gender).lower() else "Male"
-                    )
-                    df.loc[df["s/n"] == s_n, "sex"] = gender_clean
+            def safe_fetch(p):
+                try:
+                    return client.fetch_enrollee_details(p)
+                except Exception:
+                    traceback.print_exc()
+                    return None
+
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                results = list(executor.map(safe_fetch, has_policy["policy_number"].tolist()))
+
+            for s_n, res in zip(has_policy["s/n"], results):
+                if res is None:
+                    continue
+                found_count += 1
+                row = df["s/n"] == s_n
+                df.loc[row, "age_numeric"] = parse_age_from_string(res.age)
+                df.loc[row, "sex"] = "Female" if "f" in str(res.gender).lower() else "Male"
 
         remaining = missing_count - found_count
 
@@ -212,7 +213,7 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         if remaining / len(df) > 0.5:
             return DataFrameProcessResult(
                 success=False,
-                err_msg=f"Rejected: Missing age exceeds 50% ({missing_age_mask.sum()}/{len(df)})",
+                err_msg=f"Rejected: Missing age/sex exceeds 50% ({missing_age_mask.sum()}/{len(df)})",
                 missing_sex_count=int(missing_sex_mask.sum()),
                 missing_age_count=int(missing_age_mask.sum()),
             )
