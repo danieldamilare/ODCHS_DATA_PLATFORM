@@ -1,7 +1,6 @@
 from app.enrollment.session import get_his_session
 from typing import Dict, Optional, Any, List
 from dateutil import parser, relativedelta
-import re
 
 from dataclasses import dataclass
 import requests

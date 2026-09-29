@@ -173,6 +173,7 @@ def _process_image_pipeline(form: Form, batch: Batch):
     new_img_path = base + ".webp"
     
     os.replace(path, new_img_path)
+    old_path = form.img_path
     form.img_path = new_img_path
     form_uuid = form.uuid
 
@@ -185,8 +186,8 @@ def _process_image_pipeline(form: Form, batch: Batch):
     db.session.add(form)
     db.session.commit()
 
-    if form.img_path != new_img_path and os.path.exists(form.img_path):
-        os.remove(form.img_path)
+    if old_path != new_img_path and os.path.exists(old_path):
+        os.remove(old_path)
         
     db.session.remove()
 

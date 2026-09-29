@@ -491,6 +491,7 @@ def finalize_encounter_analysis(job_id):
     result_queue = EncounterKeys.get_results_key(job_id)
     all_entries = kv.hgetall(result_queue)
     kv.delete(result_queue)
+    channel = EncounterKeys.get_job_channel(job_id)
 
     kv.hset(job_key, "status", "generating")
     completed = int(kv.hget(job_key, "completed") or 0)
@@ -505,7 +506,7 @@ def finalize_encounter_analysis(job_id):
         "total": total,
     }
 
-    kv.publish(EncounterKeys.get_job_channel(job_id), json.dumps(publish_payload))
+    kv.publish(channel, json.dumps(publish_payload))
 
     try:
 
