@@ -72,10 +72,8 @@ def merge_spilled_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def sanitize_sheet_name(name):
-    """Removes invalid characters for Excel sheet names."""
-    name = str(name)
-    name = re.sub(r"[\\\/\?\*\[\]\:\']", "", name)
-    return name[:31]
+    name = re.sub(r"[\x00-\x1f\\/?*\[\]:']", "", str(name)).strip()
+    return name[:31].strip()
 
 
 def sanitize_excel_value(value):
@@ -124,6 +122,16 @@ def categorize_age(age_val) -> Optional[str]:
     if age_val <= 64:
         return "45-64"
     return "65&AB"
+
+
+POLICY_RE = re.compile(r"\w{3}/\d+/\d{2}/[A-Za-z]/\d")
+
+
+def normalize_policy_number(raw) -> Optional[str]:
+    original = str(raw).strip().upper()
+    if len(original) < 2 or not POLICY_RE.match(original):
+        return None
+    return original
 
 
 def load_clean_dataframe(file_path: str, metadata: Dict):
@@ -177,33 +185,52 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
 
         missing_count = len(to_find)
 
-        has_policy = (
-            to_find.loc[to_find["policy_number"].notna(), ["s/n", "policy_number"]]
-            .reset_index(drop=True)
-        )
+        to_find["policy_number"] = to_find["policy_number"].map(normalize_policy_number)
+
+        has_policy = to_find.loc[
+            to_find["policy_number"].notna(), ["s/n", "policy_number"]
+        ].reset_index(drop=True)
         found_count = 0
+
+        print(f"Found {len(has_policy)} missing sex/age with policy number")
 
         if not has_policy.empty:
             client = HISClient()
 
             def safe_fetch(p):
                 try:
-                    return client.fetch_enrollee_details(p)
+                    search_term = p[:-1] + "0"
+                    cur = client.fetch_enrollee_details(search_term)
+                    print("fetched enrollee details: ", cur)
                 except Exception:
                     traceback.print_exc()
                     return None
 
-            with ThreadPoolExecutor(max_workers=20) as executor:
-                results = list(executor.map(safe_fetch, has_policy["policy_number"].tolist()))
+                for obj in cur:
+                    if obj.policy_number == search_term:
+                        return obj
+                return None
+
+            with ThreadPoolExecutor(max_workers=25) as executor:
+                results = list(
+                    executor.map(safe_fetch, has_policy["policy_number"].tolist())
+                )
 
             for s_n, res in zip(has_policy["s/n"], results):
                 if res is None:
                     continue
                 found_count += 1
                 row = df["s/n"] == s_n
-                df.loc[row, "age_numeric"] = parse_age_from_string(res.age)
-                df.loc[row, "sex"] = "Female" if "f" in str(res.gender).lower() else "Male"
 
+                if df.loc[row, "age_numeric"].isna().any():
+                    df.loc[row, "age_numeric"] = parse_age_from_string(res.age)
+
+                if df.loc[row, "sex"].isna().any():
+                    df.loc[row, "sex"] = (
+                        "Female" if "f" in str(res.gender).lower() else "Male"
+                    )
+
+        print(f"found {found_count} details from the HIS")
         remaining = missing_count - found_count
 
         sex_raw = df["sex"].astype(str).str.strip().str.lower()
@@ -306,45 +333,47 @@ def process_df(df: pd.DataFrame, master_diagnosis_list):
 
 
 def save_to_file(
-    encounter_df: pd.DataFrame, utilization_list: Dict, output_filename: str
+    encounter_df: pd.DataFrame,
+    utilization_list: Dict,
+    output_filename: str,
+    summary: Optional[pd.DataFrame] = None,
 ):
     used_sheet_names = set()
 
-    try:
-        with pd.ExcelWriter(output_filename, engine="openpyxl") as writer:
+    with pd.ExcelWriter(output_filename, engine="openpyxl") as writer:
 
-            print("Saving Encounter report...")
+        print("Saving Encounter report...")
 
-            encounter_df.to_excel(writer, sheet_name="Encounter Report")
-            used_sheet_names.add("Encounter Report")
+        if summary is not None and not summary.empty:
+            summary.to_excel(writer, sheet_name="analysis_summary")
+            used_sheet_names.add("analysis_summary")
+        encounter_df.to_excel(writer, sheet_name="Encounter Report")
+        used_sheet_names.add("Encounter Report")
 
-            print(f"Saving {len(utilization_list)} facility utilization reports...")
+        print(f"Saving {len(utilization_list)} facility utilization reports...")
 
-            for facility_name, report_df in utilization_list.items():
-                base_name = sanitize_sheet_name(facility_name)
-                if not base_name:
-                    base_name = "Unnamed_Facility"
-                sheet_name = base_name
-                count = 1
+        for facility_name, report_df in utilization_list.items():
+            base_name = sanitize_sheet_name(facility_name)
+            if not base_name:
+                base_name = "Unnamed_Facility"
+            sheet_name = base_name
+            count = 1
 
-                while sheet_name in used_sheet_names:
-                    suffix = f"_{count}"
-                    trunc_len = 31 - len(suffix)
-                    sheet_name = f"{base_name[:trunc_len]}{suffix}"
-                    count += 1
+            while sheet_name in used_sheet_names:
+                suffix = f"_{count}"
+                trunc_len = 31 - len(suffix)
+                sheet_name = f"{base_name[:trunc_len]}{suffix}"
+                count += 1
 
-                    if count > 100:
-                        print(
-                            f" - Collision limit reached for {facility_name}. Using unique index."
-                        )
-                        sheet_name = f"Facility_{id(report_df) % 10000}"
-                        break
+                if count > 100:
+                    print(
+                        f" - Collision limit reached for {facility_name}. Using unique index."
+                    )
+                    sheet_name = f"Facility_{id(report_df) % 10000}"
+                    break
 
-                used_sheet_names.add(sheet_name)
+            used_sheet_names.add(sheet_name)
 
-                report_df.to_excel(writer, sheet_name=sheet_name)
+            report_df.to_excel(writer, sheet_name=sheet_name)
 
-        print(f"Successfully saved all reports to {output_filename}")
-
-    except Exception as e:
-        print(f"Critical Error during file save: {e}")
+    print(f"Successfully saved all reports to {output_filename}")
