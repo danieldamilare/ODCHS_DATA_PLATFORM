@@ -58,6 +58,7 @@ class EncounterServices:
     def process_user_answer(self, job_idx: str, job_num: int, json_response: Dict):
         job_key = EncounterKeys.get_job_key(job_idx)
         metadata_key = EncounterKeys.get_metadata_key(job_idx, job_num)
+        path = str(kv.hget(job_key, f"job:{job_num}") or "")
 
         state = str(kv.hget(job_key, "state") or "")
         current_job = int(kv.hget(job_key, "current_job") or 0)
