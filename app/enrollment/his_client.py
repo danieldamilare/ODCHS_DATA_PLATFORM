@@ -85,9 +85,9 @@ class HISEnrolleeDetails:
             policy_number=item.get("enrolleeNo", ""),
             facility=item.get("providerName", ""),
             ward=item.get("ward", ""),
-            lga=item.get("city", ""),  
+            lga=item.get("city", ""),
             surname=item.get("surname", ""),
-            firstname=item.get("middleName", "").strip(),  
+            firstname=item.get("middleName", "").strip(),
             othername=item.get("othername", ""),
             dob=cls._parse_dob(item.get("dob_MM_dd_yyyy")),
             gender=item.get("gender", ""),
@@ -107,7 +107,7 @@ class HISClient:
 
     @retry(
         stop=stop_after_attempt(4),
-        wait=wait_exponential(1, 3, 10),
+        wait=wait_exponential(multiplier=1, min=3, max=10),
         retry=retry_if_exception_type(IOError),
         reraise=True,
     )
@@ -140,7 +140,7 @@ class HISClient:
 
     @retry(
         stop=stop_after_attempt(4),
-        wait=wait_exponential(1, 3, 10),
+        wait=wait_exponential(multiplier=1, min=3, max=10),
         retry=retry_if_exception_type(IOError),
         reraise=True,
     )
@@ -153,6 +153,7 @@ class HISClient:
 
         try:
             res = self.session.get(url, params=param)
+            print(f"res with url: {res.url}")
         except requests.RequestException:
             raise IOError("Error communication to his site")
 
@@ -192,7 +193,7 @@ class HISClient:
 
     @retry(
         stop=stop_after_attempt(4),
-        wait=wait_exponential(1, 3, 10),
+        wait=wait_exponential(multiplier=1, min=3, max=10),
         retry=retry_if_exception_type(IOError),
         reraise=True,
     )
@@ -490,9 +491,8 @@ class HISClient:
         }
 
 
-    def fetch_enrollee_details(self, policy_number: str):
-        original_policy_number = policy_number
-        policy_number = policy_number[-1] + "0"
+    def fetch_enrollee_details(self, policy_number: str) -> List[HISEnrolleeDetails]:
+        print("Fetching enrollee with policy number", policy_number)
         params = {
             "getBeneficiariesDepend": "",
             "startDate": "",
@@ -504,12 +504,6 @@ class HISClient:
             "status": "active",
             "scname": policy_number,
         }
-        try:
-            result = self._execute_get(param=params)
-            list_dict = HISEnrolleeDetails.from_response(result)
-            for obj in list_dict:
-                if obj.policy_number == original_policy_number:
-                    return obj
-            return None
-        except Exception:
-            return None
+        result = self._execute_get(param=params)
+        list_dict = HISEnrolleeDetails.from_response(result)
+        return list_dict

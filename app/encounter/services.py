@@ -58,6 +58,7 @@ class EncounterServices:
     def process_user_answer(self, job_idx: str, job_num: int, json_response: Dict):
         job_key = EncounterKeys.get_job_key(job_idx)
         metadata_key = EncounterKeys.get_metadata_key(job_idx, job_num)
+        path = str(kv.hget(job_key, f"job:{job_num}") or "")
 
         state = str(kv.hget(job_key, "state") or "")
         current_job = int(kv.hget(job_key, "current_job") or 0)
@@ -75,14 +76,22 @@ class EncounterServices:
             kv.hset(
                 EncounterKeys.get_results_key(job_idx),
                 str(job_num),
-                json.dumps({"skipped": True}),
+                json.dumps(
+                    {
+                        "status": "skipped",
+                        "file": os.path.basename(path),
+                        "reason": "skipped by user",
+                    }
+                ),
             )
+            kv.delete(metadata_key)
 
             set_next_state(job_idx, "done_validating", run_analysis=False)
 
             kv.hdel(job_key, "pending_question")
             if kv.hlen(EncounterKeys.get_results_key(job_idx)) == total_length:
-                finalize_encounter_analysis.delay(job_idx)
+                if kv.hsetnx(EncounterKeys.get_job_key(job_idx), "done", "true"):
+                    finalize_encounter_analysis.delay(job_idx)
             else:
                 start_encounter_validation.delay(job_idx)
             return {"success": True, "msg": "Successfully skipped sheet"}

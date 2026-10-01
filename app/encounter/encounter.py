@@ -47,8 +47,13 @@ def merge_spilled_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
     primary = df["client_name"].map(is_valid)
     group_id = primary.astype(int).cumsum()
 
-    df = df[group_id > 0].copy()
-    group_id = group_id[group_id > 0]
+    valid_group_mask = group_id > 0
+    if not valid_group_mask.any():
+        return df.iloc[0:0].copy()
+
+    df = df[valid_group_mask].copy().reset_index(drop=True)
+    primary = primary[valid_group_mask].reset_index(drop=True)
+    group_id = group_id[valid_group_mask].reset_index(drop=True)
 
     valid_diag_mask = df["diagnosis"].map(is_valid)
 
@@ -58,10 +63,8 @@ def merge_spilled_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
         .apply(" ".join)
     )
 
-    is_primary_row = primary[group_id > 0]
-    result = df[is_primary_row].copy().reset_index(drop=True)
-
-    primary_group_ids = group_id[is_primary_row].values
+    result = df[primary].copy().reset_index(drop=True)
+    primary_group_ids = group_id[primary].values
     result["diagnosis"] = [merged_diag.get(gid, "") for gid in primary_group_ids]
     result.reset_index(drop=True, inplace=True)
     result = result[result["diagnosis"].map(is_valid)]
@@ -69,10 +72,8 @@ def merge_spilled_diagnosis(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def sanitize_sheet_name(name):
-    """Removes invalid characters for Excel sheet names."""
-    name = str(name)
-    name = re.sub(r"[\\\/\?\*\[\]\:\']", "", name)
-    return name[:31]
+    name = re.sub(r"[\x00-\x1f\\/?*\[\]:']", "", str(name)).strip()
+    return name[:31].strip()
 
 
 def sanitize_excel_value(value):
@@ -123,6 +124,16 @@ def categorize_age(age_val) -> Optional[str]:
     return "65&AB"
 
 
+POLICY_RE = re.compile(r"\w{3}/\d+/\d{2}/[A-Za-z]/\d")
+
+
+def normalize_policy_number(raw) -> Optional[str]:
+    original = str(raw).strip().upper()
+    if len(original) < 2 or not POLICY_RE.match(original):
+        return None
+    return original
+
+
 def load_clean_dataframe(file_path: str, metadata: Dict):
     try:
         facility_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -135,6 +146,8 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
 
         df.dropna(axis=0, how="all", inplace=True)
         columns = list(df.columns)
+        print("columns", columns)
+        print("metadata[col]", metadata["col"])
 
         for key, value in metadata["col"].items():
             columns[int(value)] = key
@@ -143,9 +156,10 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
             re.sub(r"[^a-z0-9]", "_", col.lower().strip().replace(" ", "_"))
             for col in columns
         ]
+        print(columns)
+
         df.columns = columns
         df["facility"] = facility_name
-        df.dropna(axis=1, how="all", inplace=True)
         df = merge_spilled_diagnosis(df)
 
         needed_column = ["policy_number", "age", "sex", "diagnosis", "client_name"]
@@ -155,7 +169,6 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         df["s/n"] = range(1, len(df) + 1)  # use to mark index for us later to value
 
         if df.empty:
-
             return DataFrameProcessResult(
                 success=False, err_msg=f"{file_path} is empty."
             )
@@ -171,26 +184,53 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         to_find.reset_index(drop=True, inplace=True)
 
         missing_count = len(to_find)
-        policy_numbers = to_find["policy_number"].tolist()
-        found_count = 0
-        if not to_find.empty:
-            with ThreadPoolExecutor(max_workers=20) as executor:
-                client = HISClient()
-                result = executor.map(
-                    client.fetch_enrollee_details, policy_numbers
-                )  # map retains order
 
-                for idx, res in enumerate(result):
-                    if res is None:
-                        continue
-                    found_count += 1
-                    s_n = to_find.loc[idx, "s/n"]
-                    df.loc[df["s/n"] == s_n, "age_numeric"] = res.age
-                    gender_clean = (
+        to_find["policy_number"] = to_find["policy_number"].map(normalize_policy_number)
+
+        has_policy = to_find.loc[
+            to_find["policy_number"].notna(), ["s/n", "policy_number"]
+        ].reset_index(drop=True)
+        found_count = 0
+
+        print(f"Found {len(has_policy)} missing sex/age with policy number")
+
+        if not has_policy.empty:
+            client = HISClient()
+
+            def safe_fetch(p):
+                try:
+                    search_term = p[:-1] + "0"
+                    cur = client.fetch_enrollee_details(search_term)
+                    print("fetched enrollee details: ", cur)
+                except Exception:
+                    traceback.print_exc()
+                    return None
+
+                for obj in cur:
+                    if obj.policy_number == search_term:
+                        return obj
+                return None
+
+            with ThreadPoolExecutor(max_workers=25) as executor:
+                results = list(
+                    executor.map(safe_fetch, has_policy["policy_number"].tolist())
+                )
+
+            for s_n, res in zip(has_policy["s/n"], results):
+                if res is None:
+                    continue
+                found_count += 1
+                row = df["s/n"] == s_n
+
+                if df.loc[row, "age_numeric"].isna().any():
+                    df.loc[row, "age_numeric"] = parse_age_from_string(res.age)
+
+                if df.loc[row, "sex"].isna().any():
+                    df.loc[row, "sex"] = (
                         "Female" if "f" in str(res.gender).lower() else "Male"
                     )
-                    df.loc[df["s/n"] == s_n, "sex"] = gender_clean
 
+        print(f"found {found_count} details from the HIS")
         remaining = missing_count - found_count
 
         sex_raw = df["sex"].astype(str).str.strip().str.lower()
@@ -200,7 +240,7 @@ def load_clean_dataframe(file_path: str, metadata: Dict):
         if remaining / len(df) > 0.5:
             return DataFrameProcessResult(
                 success=False,
-                err_msg=f"Rejected: Missing age exceeds 50% ({missing_age_mask.sum()}/{len(df)})",
+                err_msg=f"Rejected: Missing age/sex exceeds 50% ({missing_age_mask.sum()}/{len(df)})",
                 missing_sex_count=int(missing_sex_mask.sum()),
                 missing_age_count=int(missing_age_mask.sum()),
             )
@@ -258,7 +298,10 @@ def process_df(df: pd.DataFrame, master_diagnosis_list):
         enc_table.index.name = "Facility"
         enc_table = enc_table.reindex(columns=all_cols, fill_value=np.nan)
         classified = classify_diagnosis(df["diagnosis"].tolist())
-        df["classified_diagnosis"] = classified
+        df["classified_diagnosis"] = [
+            diag if (isinstance(diag, list) and len(diag) > 0) else ["OTHERS"]
+            for diag in classified
+        ]
         df = df.explode("classified_diagnosis").reset_index(drop=True)
         df["diagnosis"] = df["classified_diagnosis"]
         facility = df["facility"].iloc[0]
@@ -290,45 +333,47 @@ def process_df(df: pd.DataFrame, master_diagnosis_list):
 
 
 def save_to_file(
-    encounter_df: pd.DataFrame, utilization_list: Dict, output_filename: str
+    encounter_df: pd.DataFrame,
+    utilization_list: Dict,
+    output_filename: str,
+    summary: Optional[pd.DataFrame] = None,
 ):
     used_sheet_names = set()
 
-    try:
-        with pd.ExcelWriter(output_filename, engine="openpyxl") as writer:
+    with pd.ExcelWriter(output_filename, engine="openpyxl") as writer:
 
-            print("Saving Encounter report...")
+        print("Saving Encounter report...")
 
-            encounter_df.to_excel(writer, sheet_name="Encounter Report")
-            used_sheet_names.add("Encounter Report")
+        if summary is not None and not summary.empty:
+            summary.to_excel(writer, sheet_name="analysis_summary")
+            used_sheet_names.add("analysis_summary")
+        encounter_df.to_excel(writer, sheet_name="Encounter Report")
+        used_sheet_names.add("Encounter Report")
 
-            print(f"Saving {len(utilization_list)} facility utilization reports...")
+        print(f"Saving {len(utilization_list)} facility utilization reports...")
 
-            for facility_name, report_df in utilization_list.items():
-                base_name = sanitize_sheet_name(facility_name)
-                if not base_name:
-                    base_name = "Unnamed_Facility"
-                sheet_name = base_name
-                count = 1
+        for facility_name, report_df in utilization_list.items():
+            base_name = sanitize_sheet_name(facility_name)
+            if not base_name:
+                base_name = "Unnamed_Facility"
+            sheet_name = base_name
+            count = 1
 
-                while sheet_name in used_sheet_names:
-                    suffix = f"_{count}"
-                    trunc_len = 31 - len(suffix)
-                    sheet_name = f"{base_name[:trunc_len]}{suffix}"
-                    count += 1
+            while sheet_name in used_sheet_names:
+                suffix = f"_{count}"
+                trunc_len = 31 - len(suffix)
+                sheet_name = f"{base_name[:trunc_len]}{suffix}"
+                count += 1
 
-                    if count > 100:
-                        print(
-                            f" - Collision limit reached for {facility_name}. Using unique index."
-                        )
-                        sheet_name = f"Facility_{id(report_df) % 10000}"
-                        break
+                if count > 100:
+                    print(
+                        f" - Collision limit reached for {facility_name}. Using unique index."
+                    )
+                    sheet_name = f"Facility_{id(report_df) % 10000}"
+                    break
 
-                used_sheet_names.add(sheet_name)
+            used_sheet_names.add(sheet_name)
 
-                report_df.to_excel(writer, sheet_name=sheet_name)
+            report_df.to_excel(writer, sheet_name=sheet_name)
 
-        print(f"Successfully saved all reports to {output_filename}")
-
-    except Exception as e:
-        print(f"Critical Error during file save: {e}")
+    print(f"Successfully saved all reports to {output_filename}")
