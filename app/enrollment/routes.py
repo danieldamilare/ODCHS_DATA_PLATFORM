@@ -71,7 +71,7 @@ def batch_post():
             lga_no=parse_opt_int(request.form.get("lga_no")),
             ward_no=parse_opt_int(request.form.get("ward_no")),
             facility_no=parse_opt_int(request.form.get("facility_no")),
-            scheme=request.form.get("scheme")
+            scheme=request.form.get("scheme") or None
         )
     except ValidationError as e:
         return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
@@ -83,7 +83,7 @@ def batch_post():
         facility_no=uploader.facility_no,
         file=uploader.batch_file,
         name=uploader.name,
-        scheme=current_user.scheme
+        scheme=uploader.scheme if uploader.scheme else current_user.scheme
     )
 
     if result.status == "duplicate":
@@ -481,6 +481,20 @@ def get_passport_asset(asset_id: str):
     )
 
 
+@enrollment_bp.get("/asset/passport/dependant/<string:dpd_id>")
+@login_required
+def get_dependant_passport_asset(dpd_id: str):
+    from app.enrollment.models import Dependants
+    dpd = db.session.scalar(sa.select(Dependants).where(Dependants.uuid == dpd_id))
+    if not dpd or not dpd.passport_path or not dpd.form:
+        return (jsonify({"success": False, "msg": "Asset cannot be found"}), 404)
+    return send_from_directory(
+        os.path.join(current_app.config["PASSPORT_PATH"], dpd.form.batch.uuid),
+        os.path.basename(dpd.passport_path),
+        max_age=86400,
+    )
+
+
 @enrollment_bp.get("/form/<string:form_id>")
 @login_required
 def get_form(form_id: str):
@@ -718,11 +732,25 @@ def get_wards(lga_id):
     return jsonify([{"id": code, "name": name} for name, code in wards.items()]), 200, {"Cache-Control":  f"public, max-age={CACHE_1_YEAR}"}
 
 
-@enrollment_bp.route("/facilities/<int:ward_id>")
+@enrollment_bp.route("/facilities/<int:target_id>")
 @login_required
-def get_facilities(ward_id):
+def get_facilities(target_id):
     loader = get_loader()
-    facilities = loader.facilities.get(str(ward_id), {})
+    scheme_param = request.args.get("scheme", "bhcpfp")
+    plan_id = loader.get_plan_id(scheme_param)
+    facs_map = loader.get_facilities(plan_id)
+    facilities = facs_map.get(str(target_id), {})
+    return jsonify([{"id": code, "name": name} for name, code in facilities.items()]), {"Cache-Control":  f"public, max-age={CACHE_90_DAYS}"}
+
+
+@enrollment_bp.route("/facilities/lga/<int:lga_id>")
+@login_required
+def get_facilities_by_lga(lga_id):
+    loader = get_loader()
+    scheme_param = request.args.get("scheme", "oranghis")
+    plan_id = loader.get_plan_id(scheme_param)
+    facs_map = loader.get_facilities(plan_id)
+    facilities = facs_map.get(str(lga_id), {})
     return jsonify([{"id": code, "name": name} for name, code in facilities.items()]), {"Cache-Control":  f"public, max-age={CACHE_90_DAYS}"}
  
 

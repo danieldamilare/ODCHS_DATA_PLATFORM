@@ -92,23 +92,21 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
         img_approx.append(cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE))
     else:
         img_approx.append(img)
-        img_approx.append(cv2.rotate(img, cv2.ROTATE_180))
 
     detector = cv2.FaceDetectorYN.create(
         model=YUNET_MODEL_PATH,
         config="",
         input_size=(0, 0),
-        score_threshold=0.40,
+        score_threshold=0.35,
         nms_threshold=0.20,
     )
 
-    MAX_FACES = 1
-    if form_scheme == ODCHCScheme.SUNSHIS:
-        MAX_FACES = 5
-    elif form_scheme == ODCHCScheme.ORANGHIS:
+    if form_scheme in (ODCHCScheme.SUNSHIS, ODCHCScheme.ORANGHIS, ODCHCScheme.ABIYAMO):
+        MAX_FACES = 6
+    else:
         MAX_FACES = 1
 
-    POSITION_THRESHOLD = 0.45  # only applied for single-face schemes
+    POSITION_THRESHOLD = 0.60  # only applied for single-face schemes
 
     for img in img_approx:
 

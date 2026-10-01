@@ -233,32 +233,215 @@ class HISClient:
         )
 
     def _build_payload(self, data: Dict[str, Any]):
+        dependants_data = data.get("dependants") or []
+        marital_status = str(data.get("marital_status") or "Single").strip()
+        is_married = marital_status.lower() == "married"
+
+        spouse_dpd = None
+        children_dpds = []
+
+        if is_married:
+            for dpd in dependants_data:
+                if dpd.get("is_spouse") and spouse_dpd is None:
+                    spouse_dpd = dpd
+                else:
+                    children_dpds.append(dpd)
+        else:
+            children_dpds = list(dependants_data)
+
+        # Build spouse array
+        spouses = []
+        if spouse_dpd:
+            full_name = (spouse_dpd.get("name") or "").strip()
+            name_parts = full_name.split(" ", 1)
+            first_name = name_parts[0] if name_parts else ""
+            surname = name_parts[1] if len(name_parts) > 1 else (data.get("surname") or "")
+            dob_val = spouse_dpd.get("dob") or ""
+            try:
+                if dob_val:
+                    from dateutil import parser
+                    dob_formatted = parser.parse(dob_val).strftime("%m-%d-%Y")
+                else:
+                    dob_formatted = ""
+            except Exception:
+                dob_formatted = dob_val
+
+            spouses.append({
+                "Course_of_Study": "",
+                "Department": "",
+                "Genotype": "",
+                "MDALGA": "",
+                "Matriculation_number": "",
+                "NIIN": "",
+                "ORIN": "",
+                "Total_years_of_study": "",
+                "Type_of_Study": "",
+                "Year_of_Study": "",
+                "association": "",
+                "birthCerticateBase64String": "",
+                "bloodGroup": "",
+                "bloodPressure": "",
+                "cadre": "",
+                "category": "",
+                "spouse_id": 0,
+                "enrollee_id": 0,
+                "citizenCategoryCode": 0,
+                "city_id": str(spouse_dpd.get("lga_no") or data.get("city_id") or data.get("lga") or "794"),
+                "dob_MM_dd_yyyy": dob_formatted,
+                "firstAppointmentDate": "",
+                "firstName": first_name.title() if first_name else "",
+                "gender": spouse_dpd.get("gender") or "Female",
+                "government_id": "",
+                "gradeLevel": "",
+                "height": 0,
+                "jobtitle": "",
+                "latitude": 0,
+                "levelOfEducation": "",
+                "longitude": 0,
+                "maritalStatus": "Married",
+                "mobileNo": spouse_dpd.get("phone_number") or data.get("phone_number") or "",
+                "nationality": "",
+                "occupation": "",
+                "organization": "",
+                "originLGA": "-select lga-",
+                "originState": "Ondo",
+                "pictureBase64String": spouse_dpd.get("b64_passport") or "",
+                "plan_id": str(data.get("plan_id") or "5"),
+                "present_lga": "",
+                "provider_id": str(spouse_dpd.get("facility_no") or data.get("facility") or data.get("provider_id") or ""),
+                "religion": "",
+                "retirementDate": "",
+                "settlement": "",
+                "stateCode": "",
+                "state_id": str(data.get("state_id") or "29"),
+                "surgicalHistory": "",
+                "surname": surname.title() if surname else "",
+                "tribe": "",
+                "university": "",
+                "ward_id": None,
+                "weight": 0,
+            })
+
+        # Build children array
+        children = []
+        for child_dpd in children_dpds:
+            full_name = (child_dpd.get("name") or "").strip()
+            name_parts = full_name.split(" ", 1)
+            first_name = name_parts[0] if name_parts else ""
+            surname = name_parts[1] if len(name_parts) > 1 else (data.get("surname") or "")
+            dob_val = child_dpd.get("dob") or ""
+            try:
+                if dob_val:
+                    from dateutil import parser
+                    dob_formatted = parser.parse(dob_val).strftime("%m-%d-%Y")
+                else:
+                    dob_formatted = ""
+            except Exception:
+                dob_formatted = dob_val
+
+            child_dict = {
+                "Course_of_Study": "",
+                "Department": "",
+                "Genotype": "",
+                "MDALGA": "",
+                "Matriculation_number": "",
+                "NIIN": "",
+                "ORIN": "",
+                "Total_years_of_study": "",
+                "Type_of_Study": "",
+                "Year_of_Study": "",
+                "association": "",
+                "birthCerticateBase64String": "",
+                "bloodGroup": "",
+                "bloodPressure": "",
+                "cadre": "",
+                "category": "",
+                "child_id": 0,
+                "citizenCategoryCode": 0,
+                "city_id": str(child_dpd.get("lga_no") or data.get("city_id") or data.get("lga") or "794"),
+                "dob_MM_dd_yyyy": dob_formatted,
+                "enrollee_id": 0,
+                "firstAppointmentDate": "",
+                "firstName": first_name.title() if first_name else "",
+                "gender": child_dpd.get("gender") or "Male",
+                "government_id": "",
+                "gradeLevel": "",
+                "height": 0,
+                "jobtitle": "",
+                "latitude": 0,
+                "levelOfEducation": "",
+                "longitude": 0,
+                "maritalStatus": "Single",
+                "mobileNo": child_dpd.get("phone_number") or data.get("phone_number") or "",
+                "nationality": "",
+                "occupation": "",
+                "organization": "",
+                "originLGA": "-select lga-",
+                "originState": "Ondo",
+                "pictureBase64String": child_dpd.get("b64_passport") or "",
+                "plan_id": str(data.get("plan_id") or "5"),
+                "present_lga": "",
+                "provider_id": str(child_dpd.get("facility_no") or data.get("facility") or data.get("provider_id") or ""),
+                "religion": "",
+                "retirementDate": "",
+                "settlement": "",
+                "stateCode": "",
+                "state_id": str(data.get("state_id") or "29"),
+                "surgicalHistory": "",
+                "surname": surname.title() if surname else "",
+                "tribe": "",
+                "university": "",
+                "ward_id": None,
+                "weight": 0,
+            }
+            children.append(child_dict)
+
+        child_med_0 = []
+        child_med_1 = []
+        child_med_2 = []
+        child_med_3 = []
+        for i, ch_dpd in enumerate(children_dpds[:4]):
+            if ch_dpd.get("medical_history"):
+                med_item = [{"illness": ch_dpd.get("medical_history")}]
+                if i == 0:
+                    child_med_0 = med_item
+                elif i == 1:
+                    child_med_1 = med_item
+                elif i == 2:
+                    child_med_2 = med_item
+                elif i == 3:
+                    child_med_3 = med_item
+
+        spouse_med = []
+        if spouse_dpd and spouse_dpd.get("medical_history"):
+            spouse_med = [{"illness": spouse_dpd.get("medical_history")}]
+
         return {
             "cooperateCode": "",
-            "title": data["title"],
-            "surname": data["surname"].title(),
-            "othername": data["first_name"].title(),
-            "middleName": data["other_name"].title(),
-            "mobileNo": data["phone_number"],
+            "title": data.get("title", ""),
+            "surname": (data.get("surname") or "").title(),
+            "othername": (data.get("first_name") or "").title(),
+            "middleName": (data.get("other_name") or "").title(),
+            "mobileNo": data.get("phone_number", ""),
             "mobileNo1": "",
             "emailAddress": "",
             "emailAddress1": "",
-            "dob_MM_dd_yyyy": data["dob"],
-            "address": data["address"].title(),
-            "state_id": data["state_id"],
-            "city_id": data["lga"],
-            "picture_base64String": data["b64_passport"],
-            "maritalStatus": data["marital_status"],
+            "dob_MM_dd_yyyy": data.get("dob", ""),
+            "address": (data.get("address") or "").title(),
+            "state_id": str(data.get("state_id", "29")),
+            "city_id": str(data.get("lga", "")),
+            "picture_base64String": data.get("b64_passport", ""),
+            "maritalStatus": data.get("marital_status", "Single"),
             "religion": None,
             "nationality": None,
             "ORIN": "",
-            "plan_id": data["plan_id"],
+            "plan_id": str(data.get("plan_id", "1")),
             "tribe": None,
             "height": 0,
             "weight": 0,
             "bloodPressure": 0,
-            "gender": data["gender"],
-            "citizenCategoryCode": data["category"],
+            "gender": data.get("gender", "Male"),
+            "citizenCategoryCode": data.get("category") or 0,
             "ageOfPregnancy": 0,
             "numberPreviousPreg": 0,
             "CaesareanHistory": "",
@@ -269,96 +452,43 @@ class HISClient:
             "category": "",
             "MDALGA": "",
             "present_lga": "",
-            "government_id": "",
+            "government_id": data.get("employment_id", ""),
             "stateCode": "",
             "cadre": "",
             "gradeLevel": "",
             "firstAppointmentDate": "",
             "retirementDate": "",
             "originState": "Ondo",
-            "originLGA": data["origin_lga"].title(),
-            "ward_id": data["ward"],
-            "provider_id": data["facility"],
+            "originLGA": (data.get("origin_lga") or "").title(),
+            "ward_id": data.get("ward"),
+            "provider_id": str(data.get("facility") or ""),
             "occupation": None,
             "surgicalHistory": "",
             "levelOfEducation": None,
-            "NIIN": data["nin"],
-            "settlement": data["settlement"],
+            "NIIN": data.get("nin", ""),
+            "settlement": data.get("settlement", ""),
             "medicalHistory": [],
-            "spoumedicalHistory": [],
-            "childmedicalHistory_0": [],
-            "childmedicalHistory_1": [],
-            "childmedicalHistory_2": [],
-            "childmedicalHistory_3": [],
+            "spoumedicalHistory": spouse_med,
+            "childmedicalHistory_0": child_med_0,
+            "childmedicalHistory_1": child_med_1,
+            "childmedicalHistory_2": child_med_2,
+            "childmedicalHistory_3": child_med_3,
             "nextOfKins": [
                 {
-                    "firstname": data["next_of_kin"]["first_name"],
-                    "surname": data["next_of_kin"]["surname"],
-                    "otherName": data["next_of_kin"]["other_name"],
-                    "relationsipType": data["next_of_kin"]["relationship"],
-                    "mobileNo": data["next_of_kin"]["phone_number"],
-                    "contactAddress": data["next_of_kin"]["address"],
+                    "firstname": (data.get("next_of_kin") or {}).get("first_name", ""),
+                    "surname": (data.get("next_of_kin") or {}).get("surname", ""),
+                    "otherName": (data.get("next_of_kin") or {}).get("other_name", ""),
+                    "relationsipType": (data.get("next_of_kin") or {}).get("relationship", ""),
+                    "mobileNo": (data.get("next_of_kin") or {}).get("phone_number", ""),
+                    "contactAddress": (data.get("next_of_kin") or {}).get("address", ""),
                     "state": "Ondo",
-                    "city": data["origin_lga"].title(),
+                    "city": (data.get("origin_lga") or "").title(),
                 }
             ],
-            "spouses": [
-                {
-                    "spouse_id": 0,
-                    "enrollee_id": 0,
-                    "surname": "",
-                    "firstName": "",
-                    "dob_MM_dd_yyyy": "",
-                    "pictureBase64String": "",
-                    "mobileNo": "",
-                    "Type_of_Study": "",
-                    "Department": "",
-                    "Course_of_Study": "",
-                    "Matriculation_number": "",
-                    "Year_of_Study": "",
-                    "Total_years_of_study": "",
-                    "present_lga": "",
-                    "maritalStatus": data["marital_status"],
-                    "religion": None,
-                    "tribe": None,
-                    "plan_id": "1",
-                    "latitude": 0,
-                    "longitude": 0,
-                    "nationality": None,
-                    "state_id": data["state_id"],
-                    "city_id": data["lga"],
-                    "provider_id": None,
-                    "height": 0,
-                    "weight": 0,
-                    "bloodPressure": "",
-                    "citizenCategoryCode": 0,
-                    "originState": "State of Origin",
-                    "originLGA": "LGA of Origin",
-                    "ward_id": data["ward"],
-                    "occupation": None,
-                    "NIIN": "",
-                    "settlement": "",
-                    "organization": "",
-                    "jobtitle": "",
-                    "category": "",
-                    "MDALGA": "",
-                    "government_id": "",
-                    "stateCode": "",
-                    "cadre": "",
-                    "gradeLevel": "",
-                    "firstAppointmentDate": "",
-                    "retirementDate": "",
-                    "bloodGroup": "",
-                    "Genotype": "",
-                    "ORIN": "",
-                    "association": "",
-                    "surgicalHistory": "",
-                    "levelOfEducation": None,
-                    "university": "",
-                }
-            ],
-            "children": [],
+            "spouses": spouses,
+            "children": children,
         }
+
 
     def fetch_enrollee_details(self, policy_number: str):
         original_policy_number = policy_number

@@ -13,12 +13,16 @@ class DataLoader:
     plan_id = 1  # BHCPF hardcoded
     STABLE_TTL = 100 * 60 * 60 * 24
     VOLATILE_TTL = 10 * 60 * 60 * 24
+    plans = {}
+    plan_id = {"SUNSHIS": 4, "ORANGHIS": 5, "BHCPFP": 1}
 
     def __init__(self):
         self.citizen_types: Optional[Dict] = None
         self.lgas: Optional[Dict] = None
         self.wards: Optional[Dict] = None
         self.facilities: Optional[Dict] = None
+        self._all_facilities: Optional[Dict] = None
+        self._all_reverse_facilities: Optional[Dict] = None
         # notice the his route uses raw string as Marital status so this is dead code
         # self.marital_status: Optional[Dict] = None
         self.reverse_lga: Optional[Dict] = None
@@ -34,6 +38,59 @@ class DataLoader:
         self.load_wards()
         self.load_facilities()
 
+    def get_plan_id(self, scheme) -> int:
+        if scheme is None:
+            return 1
+        key = scheme.name if hasattr(scheme, "name") else str(scheme).upper()
+        return self.plan_id.get(key, 1)
+    
+    def _fetch_facilities_for_plan(self, plan_id: int = 1):
+        cached = kv.get(f"loader:facilities:{plan_id}")
+        rev_cached = kv.get(f"loader:reverse_facilities:{plan_id}")
+        if cached and rev_cached:
+            return json.loads(cached), json.loads(rev_cached)
+
+        res = self.session.get(f"{BASE}?getProvidersByWard=0&planid={plan_id}").json()
+        providers = res.get("providers", [])
+
+        fac_map = {}
+        rev_fac_map = {}
+
+        is_bhcpf = str(plan_id) == "1"
+
+        for p in providers:
+            key = p["providerName"].upper().strip()
+            lga_name = (p.get("city") or "").upper().strip()
+
+            if is_bhcpf:
+                if not self.lgas or lga_name not in self.lgas:
+                    continue
+                lga_code = str(self.lgas[lga_name])
+                ward_name = (p.get("ward") or "").upper().strip()
+
+                if not self.wards or lga_code not in self.wards or ward_name not in self.wards[lga_code]:
+                    continue
+
+                ward_code = str(self.wards[lga_code][ward_name])
+                fac_map.setdefault(ward_code, {})[key] = int(p["provider_id"])
+            else:
+                lga_code = None
+                if self.lgas and lga_name in self.lgas:
+                    lga_code = str(self.lgas[lga_name])
+                elif self.lgas:
+                    for lname, lcode in self.lgas.items():
+                        if lname in lga_name or lga_name in lname:
+                            lga_code = str(lcode)
+                            break
+                if lga_code:
+                    fac_map.setdefault(lga_code, {})[key] = int(p["provider_id"])
+
+            rev_fac_map[str(p["provider_id"])] = key
+
+        kv.setex(f"loader:facilities:{plan_id}", self.VOLATILE_TTL, json.dumps(fac_map))
+        kv.setex(f"loader:reverse_facilities:{plan_id}", self.VOLATILE_TTL, json.dumps(rev_fac_map))
+        return fac_map, rev_fac_map
+
     def load_marital_status(self):
 
         cached = kv.get("loader:marital_status")
@@ -47,6 +104,7 @@ class DataLoader:
         }
         kv.setex("loader:marital_status", self.STABLE_TTL, json.dumps(marital_status))
         self.marital_status = marital_status
+
 
     def load_citizen_types(self):
 
@@ -62,6 +120,7 @@ class DataLoader:
         kv.setex(
             "loader:citizen_types", self.STABLE_TTL, json.dumps(self.citizen_types)
         )
+
 
     def load_lgas(self):
 
@@ -82,7 +141,7 @@ class DataLoader:
         kv.setex("loader:lgas", self.STABLE_TTL, json.dumps(self.lgas))
         kv.setex("loader:reverse_lga", self.STABLE_TTL, json.dumps(self.reverse_lga))
 
-    def _load_wards(self, lga_name, lga_code):
+    def _load_wards(self, lga_code):
         return self.session.get(f"{BASE}?listWard={lga_code}").json()
 
     def load_wards(self):
@@ -103,7 +162,7 @@ class DataLoader:
         count = min(20, len(self.lgas or {}))  # 20 workers since they are i/o
         with ThreadPoolExecutor(max_workers=count) as executor:
             results = {
-                executor.submit(self._load_wards, lga_name, lga_code): lga_code
+                executor.submit(self._load_wards, lga_code): lga_code
                 for lga_name, lga_code in self.lgas.items()
             }
 
@@ -122,52 +181,43 @@ class DataLoader:
         kv.setex("loader:reverse_ward", self.STABLE_TTL, json.dumps(self.reverse_ward))
 
     def load_facilities(self):
-
-        cached_fac = kv.get("loader:facilities")
-        cached_rev_fac = kv.get("loader:reverse_facilities")
-
-        if cached_fac and cached_rev_fac:
-            self.facilities = json.loads(cached_fac)
-            self.reverse_facility = json.loads(cached_rev_fac)
-            return
-
         if self.lgas is None:
             self.load_lgas()
         if self.wards is None:
             self.load_wards()
+        active_plans = [1, 4, 5]
 
-        self.facilities = {}
-        self.reverse_facility = {}
-        res = self.session.get(
-            f"{BASE}?getProvidersByWard=0&planid={self.plan_id}"
-        ).json()
-        providers = res["providers"]
+        self._all_facilities = {}
+        self._all_reverse_facilities = {}
+        combined_reverse = {}
 
-        for p in providers:
-            key = p["providerName"].upper().strip()
-            lga_name = p["city"].upper().strip()
+        for pid in active_plans:
+            facs, revs = self._fetch_facilities_for_plan(pid)
+            self._all_facilities[pid] = facs
+            self._all_reverse_facilities[pid] = revs
+            combined_reverse.update(revs)
 
-            if lga_name not in self.lgas:
-                continue
+        # Keep self.facilities pointing to BHCPF (1) so existing legacy callers don't break
+        self.facilities = self._all_facilities.get(1, {})
+        self.reverse_facility = combined_reverse
+    
+    def get_facilities(self, plan_id: int = 1) -> dict:
+        if not hasattr(self, "_all_facilities") or plan_id not in (self._all_facilities or {}):
+            facs, _ = self._fetch_facilities_for_plan(plan_id)
+            if self._all_facilities is None:
+                self._all_facilities = {}
+            self._all_facilities[plan_id] = facs
+            return facs
+        return self._all_facilities.get(plan_id, {})
 
-            lga_code = str(self.lgas[lga_name])
-            ward_name = p["ward"].upper().strip()
-
-            if ward_name not in self.wards[lga_code]:
-                continue
-
-            ward_code = str(self.wards[lga_code][ward_name])
-
-            self.facilities[ward_code] = self.facilities.get(ward_code, {})
-            self.facilities[ward_code][key] = int(p["provider_id"])
-            self.reverse_facility[str(p["provider_id"])] = key
-
-        kv.setex("loader:facilities", self.VOLATILE_TTL, json.dumps(self.facilities))
-        kv.setex(
-            "loader:reverse_facilities",
-            self.VOLATILE_TTL,
-            json.dumps(self.reverse_facility),
-        )
+    def get_reverse_facilities(self, plan_id: int = 1) -> dict:
+        if not hasattr(self, "_all_reverse_facilities") or plan_id not in (self._all_reverse_facilities or {}):
+            _, revs = self._fetch_facilities_for_plan(plan_id)
+            if self._all_reverse_facilities is None:
+                self._all_reverse_facilities = {}
+            self._all_reverse_facilities[plan_id] = revs
+            return revs
+        return self._all_reverse_facilities.get(plan_id, {})
 
 
 _loader_instance: Optional[DataLoader] = None

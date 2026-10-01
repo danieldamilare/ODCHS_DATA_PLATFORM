@@ -10,10 +10,26 @@ export default function FlagCallout({ form }) {
     if (!form?.flagged) return null;
     if (form.status?.toLowerCase() === "rejected") return null;
 
+    const scheme = (form.scheme || "bhcpfp").toLowerCase();
+    const isBhcpf = scheme === "bhcpfp" || scheme === "bhcpf";
+
     const reasons = (form.reason || "")
         .split(";")
         .map((r) => r.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter((r) => {
+            if (!isBhcpf) {
+                const lower = r.toLowerCase();
+                if (
+                    lower === "no nin provided" ||
+                    lower.includes("cannot determine category") ||
+                    lower.includes("unrecognized category")
+                ) {
+                    return false;
+                }
+            }
+            return true;
+        });
 
     if (reasons.length === 0) return null;
 

@@ -90,7 +90,7 @@ class Config:
         "app.encounter.tasks.start_encounter_analysis": "cpu_bound",
         "app.enrollment.tasks.extract_zip_for_processing": "cpu_bound",
         "app.enrollment.tasks.generate_id_card": "cpu_bound",
-        "app.enrollment.taks.get_his_id_card_payload": "io_bound",
+        "app.enrollment.tasks.get_his_id_card_payload": "io_bound",
         "app.enrollment.tasks.start_id_card_generate_job": "io_bound",
         "app.enrollment.tasks.process_image_pipeline": "io_bound",
         "app.nin_validation.tasks.finalize_nin_process": "io_bound",

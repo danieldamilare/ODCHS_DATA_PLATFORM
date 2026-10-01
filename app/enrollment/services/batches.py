@@ -87,7 +87,7 @@ class BatchServices:
             status=BatchStatus.PROCESSING,
             lga_no=lga_no,
             state_code=loader.state_code,
-            plan_id=loader.plan_id,
+            plan_id=loader.get_plan_id(scheme),
             ward_no=ward_no,
             name=name,
             facility_no=facility_no,

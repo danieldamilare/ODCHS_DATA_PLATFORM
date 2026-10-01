@@ -38,3 +38,4 @@ def run_test(image_path: str):
 
 if __name__ == "__main__":
     run_test(IMAGE_PATH)
+

@@ -110,6 +110,11 @@ class Form(db.Model):
         "medical_history",
         "facility_no",
         "passport_path",
+        "enployment_id",
+        "ext_aliment",
+        "present_mda",
+        "department",
+        "cadre",
     }
 
     id = db.Column(db.Integer, primary_key=True)
@@ -241,6 +246,11 @@ class Form(db.Model):
             "occupation": self.occupation,
             "nin_verified": self.nin_verified,
             "nin_valid": self.nin_valid,
+            "enployment_id": self.enployment_id,
+            "ext_aliment": self.ext_aliment,
+            "present_mda": self.present_mda,
+            "department": self.department,
+            "cadre": self.cadre,
             "next_of_kin": {
                 "firstname": self.kin_firstname,
                 "surname": self.kin_surname,
@@ -257,13 +267,22 @@ class Form(db.Model):
             },
             "dependants":[{
                 "id": dpd.uuid,
-                "passport_path": dpd.passport_path,
+                "passport_path": (
+                    url_for(
+                        "enrollment.get_dependant_passport_asset",
+                        dpd_id=dpd.uuid,
+                        v=int(self.updated_at.timestamp()),
+                    )
+                    if dpd.passport_path
+                    else None
+                ),
                 "sequence": dpd.sequence,
                 "name": dpd.dpd_name, 
                 "dob": dpd.dpd_dob,
                 "gender": dpd.dpd_gender,
-                "lga": (loader.reverse_lga or {}).get(str(dpd.lga_no),None),
-                "facility": (loader.reverse_facility or {}).get(str(dpd.facility_no),None),
+                "is_spouse": bool(dpd.is_spouse),
+                "lga": (loader.reverse_lga or {}).get(str(dpd.dpd_lga_no),None),
+                "facility": (loader.reverse_facility or {}).get(str(dpd.dpd_facility_no),None),
                 "lga_no": dpd.dpd_lga_no,
                 "facility_no": dpd.dpd_facility_no,
                 "medical_history": dpd.dpd_medical_history,
@@ -290,6 +309,7 @@ class Dependants(db.Model):
     dpd_name = db.Column(db.String, nullable=True)
     dpd_dob = db.Column(db.String, nullable=True)
     dpd_gender = db.Column(db.String(6), nullable=True)
+    is_spouse = db.Column(db.Boolean, default=False, nullable=True)
     dpd_lga_no = db.Column(db.Integer, nullable=True)
     dpd_facility_no = db.Column(db.Integer, nullable=True)
     dpd_medical_history = db.Column(db.Text, nullable=True)

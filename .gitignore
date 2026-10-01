@@ -15,3 +15,8 @@ logs/
 forms/*
 
 tests/output/*
+
+.tmp/
+temp/
+
+.pytest_cache/

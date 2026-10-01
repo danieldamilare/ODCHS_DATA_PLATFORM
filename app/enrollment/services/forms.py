@@ -1,5 +1,5 @@
 from app import db
-from app.enrollment.models import Form, FormStatus
+from app.enrollment.models import Form, FormStatus, Dependants
 from flask import current_app
 from app.enrollment.dataloader import get_loader
 from werkzeug.datastructures import FileStorage
@@ -18,6 +18,7 @@ import os
 import cv2
 import base64
 from datetime import datetime
+from dateutil import parser
 
 
 @dataclass
@@ -112,6 +113,49 @@ class FormServices:
             return b64_passport
 
     def _build_payload_from_form(self, form, loader, b64_passport) -> dict:
+        plan_id = loader.get_plan_id(form.scheme)
+        dependants_list = []
+        for dpd in form.dependants:
+            # Rule: non-spouse dependants older than 18 are not eligible as child dependants
+            if not dpd.is_spouse and dpd.dpd_dob:
+                try:
+                    b_date = parser.parse(dpd.dpd_dob, dayfirst=False).date()
+                    today = datetime.utcnow().date()
+                    age = today.year - b_date.year - ((today.month, today.day) < (b_date.month, b_date.day))
+                    if age > 18:
+                        continue
+                except Exception:
+                    pass
+
+            dpd_b64 = ""
+            try:
+                if dpd.passport_path:
+                    img = read_image(dpd.passport_path)
+                    _, buf = cv2.imencode(".jpg", img)
+                    dpd_b64 = base64.b64encode(buf).decode("utf-8")
+                elif dpd.passport_xmax and dpd.passport_xmax > 0:
+                    img = read_image(form.img_path)
+                    cropped = img[
+                        dpd.passport_ymin : dpd.passport_ymax,
+                        dpd.passport_xmin : dpd.passport_xmax,
+                    ]
+                    _, buf = cv2.imencode(".jpg", cropped)
+                    dpd_b64 = base64.b64encode(buf).decode("utf-8")
+            except Exception:
+                dpd_b64 = ""
+
+            dependants_list.append({
+                "name": dpd.dpd_name or "",
+                "dob": dpd.dpd_dob or "",
+                "gender": dpd.dpd_gender or "",
+                "phone_number": dpd.dpd_phone_number or "",
+                "lga_no": dpd.dpd_lga_no or form.lga_no,
+                "facility_no": dpd.dpd_facility_no or form.facility_no,
+                "medical_history": dpd.dpd_medical_history or "",
+                "is_spouse": bool(dpd.is_spouse),
+                "b64_passport": dpd_b64,
+            })
+
         return {
             "title": form.title or "",
             "surname": form.surname or "",
@@ -120,11 +164,11 @@ class FormServices:
             "phone_number": form.phone_number or "",
             "dob": form.dob or "",
             "address": form.address or "",
-            "state_id": loader.state_code,
+            "state_id": str(loader.state_code),
             "lga": form.lga_no,
             "b64_passport": b64_passport,
-            "marital_status": form.marital_status,
-            "plan_id": loader.plan_id,
+            "marital_status": form.marital_status or "Single",
+            "plan_id": plan_id,
             "gender": form.gender,
             "category": form.category,
             "origin_lga": loader.reverse_lga.get(str(form.lga_no), ""),
@@ -132,6 +176,8 @@ class FormServices:
             "facility": form.facility_no,
             "nin": form.nin or "",
             "settlement": form.settlement or "",
+            "dependants": dependants_list,
+            "employment_id": form.enployment_id,
             "next_of_kin": {
                 "first_name": form.kin_firstname or "",
                 "surname": form.kin_surname or "",
@@ -166,7 +212,8 @@ class FormServices:
             "kin_address": form.kin_address,
             "lga_no": form.lga_no,
             "ward_no": form.ward_no,
-            "facility_no": form.facility_no
+            "facility_no": form.facility_no,
+            "scheme": form.scheme,
         }
 
         try:
@@ -251,6 +298,134 @@ class FormServices:
         for key, value in updater.get_updates().items():
             if key in form.UPDATABLE_FIELDS:
                 setattr(form, key, value)
+
+        if updater.dependants is not None:
+            # Rule: Filter out any non-spouse dependants older than 18 years
+            valid_dependants_data = []
+            for d in updater.dependants:
+                is_spouse = bool(d.get("is_spouse", False))
+                dob_str = d.get("dob")
+                if not is_spouse and dob_str:
+                    try:
+                        b_date = parser.parse(dob_str, dayfirst=False).date()
+                        today = datetime.utcnow().date()
+                        age = today.year - b_date.year - ((today.month, today.day) < (b_date.month, b_date.day))
+                        if age > 18:
+                            continue
+                    except Exception:
+                        pass
+                valid_dependants_data.append(d)
+
+            kept_dpd_uuids = set()
+            for idx, dpd_data in enumerate(valid_dependants_data):
+                dpd_id = dpd_data.get("id") or dpd_data.get("uuid")
+                dpd_seq = dpd_data.get("sequence", idx + 1)
+                dpd = None
+                if dpd_id:
+                    dpd = next((d for d in form.dependants if d.uuid == dpd_id), None)
+                elif dpd_seq is not None:
+                    dpd = next((d for d in form.dependants if d.sequence == dpd_seq), None)
+
+                if dpd:
+                    kept_dpd_uuids.add(dpd.uuid)
+                    dpd.sequence = idx + 1
+                    if "name" in dpd_data:
+                        dpd.dpd_name = dpd_data["name"]
+                    if "dob" in dpd_data:
+                        dpd.dpd_dob = dpd_data["dob"]
+                    if "gender" in dpd_data:
+                        dpd.dpd_gender = dpd_data["gender"]
+                    dpd.dpd_lga_no = dpd_data.get("lga_no") or form.lga_no
+                    dpd.dpd_facility_no = dpd_data.get("facility_no") or form.facility_no
+                    dpd.dpd_phone_number = dpd_data.get("phone_number") or form.phone_number or ""
+                    if "medical_history" in dpd_data:
+                        dpd.dpd_medical_history = dpd_data["medical_history"]
+                    if "is_spouse" in dpd_data:
+                        dpd.is_spouse = bool(dpd_data["is_spouse"])
+
+                    if dpd_data.get("passport_base64") or dpd_data.get("b64_passport"):
+                        raw_b64 = dpd_data.get("passport_base64") or dpd_data.get("b64_passport")
+                        if "," in raw_b64:
+                            raw_b64 = raw_b64.split(",", 1)[1]
+                        try:
+                            img_bytes = base64.b64decode(raw_b64)
+                            passport_dir = os.path.join(current_app.config["PASSPORT_PATH"], form.batch.uuid)
+                            os.makedirs(passport_dir, exist_ok=True)
+                            dpd_file_name = f"dpd_{dpd.uuid}.jpg"
+                            save_path = os.path.join(passport_dir, dpd_file_name)
+                            with open(save_path, "wb") as f:
+                                f.write(img_bytes)
+                            dpd.passport_path = save_path
+                            dpd.passport_xmin = None
+                            dpd.passport_ymin = None
+                            dpd.passport_xmax = None
+                            dpd.passport_ymax = None
+                        except Exception as e:
+                            print(f"Error saving dependant passport image: {e}")
+                    elif "passport_coord" in dpd_data and dpd_data["passport_coord"]:
+                        c = dpd_data["passport_coord"]
+                        dpd.passport_xmin = c.get("xmin")
+                        dpd.passport_ymin = c.get("ymin")
+                        dpd.passport_xmax = c.get("xmax")
+                        dpd.passport_ymax = c.get("ymax")
+                    elif "passport_xmin" in dpd_data:
+                        dpd.passport_xmin = dpd_data.get("passport_xmin")
+                        dpd.passport_ymin = dpd_data.get("passport_ymin")
+                        dpd.passport_xmax = dpd_data.get("passport_xmax")
+                        dpd.passport_ymax = dpd_data.get("passport_ymax")
+                else:
+                    new_dpd = Dependants(
+                        form_id=form.uuid,
+                        sequence=idx + 1,
+                        dpd_name=dpd_data.get("name"),
+                        dpd_dob=dpd_data.get("dob"),
+                        dpd_gender=dpd_data.get("gender"),
+                        dpd_lga_no=dpd_data.get("lga_no") or form.lga_no,
+                        dpd_facility_no=dpd_data.get("facility_no") or form.facility_no,
+                        dpd_medical_history=dpd_data.get("medical_history"),
+                        dpd_phone_number=dpd_data.get("phone_number") or form.phone_number or "",
+                        is_spouse=bool(dpd_data.get("is_spouse", False)),
+                    )
+                    if dpd_data.get("passport_base64") or dpd_data.get("b64_passport"):
+                        raw_b64 = dpd_data.get("passport_base64") or dpd_data.get("b64_passport")
+                        if "," in raw_b64:
+                            raw_b64 = raw_b64.split(",", 1)[1]
+                        try:
+                            img_bytes = base64.b64decode(raw_b64)
+                            passport_dir = os.path.join(current_app.config["PASSPORT_PATH"], form.batch.uuid)
+                            os.makedirs(passport_dir, exist_ok=True)
+                            dpd_file_name = f"dpd_{new_dpd.uuid}.jpg"
+                            save_path = os.path.join(passport_dir, dpd_file_name)
+                            with open(save_path, "wb") as f:
+                                f.write(img_bytes)
+                            new_dpd.passport_path = save_path
+                            new_dpd.passport_xmin = None
+                            new_dpd.passport_ymin = None
+                            new_dpd.passport_xmax = None
+                            new_dpd.passport_ymax = None
+                        except Exception as e:
+                            print(f"Error saving new dependant passport image: {e}")
+                    elif "passport_coord" in dpd_data and dpd_data["passport_coord"]:
+                        c = dpd_data["passport_coord"]
+                        new_dpd.passport_xmin = c.get("xmin")
+                        new_dpd.passport_ymin = c.get("ymin")
+                        new_dpd.passport_xmax = c.get("xmax")
+                        new_dpd.passport_ymax = c.get("ymax")
+                    elif "passport_xmin" in dpd_data:
+                        new_dpd.passport_xmin = dpd_data.get("passport_xmin")
+                        new_dpd.passport_ymin = dpd_data.get("passport_ymin")
+                        new_dpd.passport_xmax = dpd_data.get("passport_xmax")
+                        new_dpd.passport_ymax = dpd_data.get("passport_ymax")
+                    form.dependants.append(new_dpd)
+                    db.session.flush()
+                    kept_dpd_uuids.add(new_dpd.uuid)
+
+            # Remove any dependants no longer in the valid list
+            for dpd in list(form.dependants):
+                if dpd.uuid not in kept_dpd_uuids:
+                    form.dependants.remove(dpd)
+                    db.session.delete(dpd)
+
 
         if updater.use_avatar:
             gender = form.gender

@@ -3,7 +3,7 @@ import uuid as uuid_tools
 from datetime import datetime
 from app.enrollment.dataloader import get_loader
 from typing import Dict, Optional
-from app.enrollment.models import Form, Dependants
+from app.enrollment.models import Form, Dependants, ODCHCScheme
 from app.enrollment.schema import OCRResponse
 import re
 
@@ -79,14 +79,21 @@ def process_title(gender: str, marital_status: str) -> str:
 def normalize_form_object(
     form: Form, batch: Dict, res: OCRResponse, coords: Dict | list
 ) -> Form:
+    print(f"OCR Response: {res}")
     flagged_reasons = []
     coords = order_faces_reading_order(coords) if isinstance(coords, list) else [coords]
+    print(f"Co-ordinates of passports: {coords}")
 
     if not res:
         form.flagged = True
         form.reason = "OCR Extraction failed: Model returned no response"
         form.nin_valid = False
         return form
+
+    is_bhcpf = (
+        getattr(form, "scheme", None) == ODCHCScheme.BHCPFP
+        or str(getattr(form, "scheme", "")).lower() in ("bhcpfp", "bhcpf", "odchcscheme.bhcpfp")
+    )
 
     form.nin = res.nin
     form.gender = res.gender
@@ -139,7 +146,7 @@ def normalize_form_object(
 
         form.category = loader.citizen_types.get(category, None)
     else:
-        flagged_reasons.append("No date of birth provided cannot determine category")
+            flagged_reasons.append("No date of birth provided cannot determine category")
 
     if res.marital_status:
         form.marital_status = res.marital_status
@@ -169,12 +176,17 @@ def normalize_form_object(
             form.settlement = "Urban" if "akure" in lga.strip().lower() else "Rural"
 
     if not form.nin:
-        flagged_reasons.append("No nin provided")
-        form.nin_valid = False
+        if is_bhcpf:
+            flagged_reasons.append("No nin provided")
+            form.nin_valid = False
+        else:
+            form.nin_valid = True
     elif not re.match(r"^\d{11}$", str(form.nin).strip()):
         flagged_reasons.append("Nin is not 11 digits or contains non numeric character")
         form.nin_valid = False
         form.nin = str(form.nin)[:11]
+    else:
+        form.nin_valid = True
 
     phone_number = form.phone_number
     kin_phone_number = form.kin_phone_number
@@ -197,15 +209,31 @@ def normalize_form_object(
         form.passport_xmax = principal_coords["x2"]
         form.passport_ymax = principal_coords["y2"]
 
-    if category and not form.category:
+    if is_bhcpf and category and not form.category:
         flagged_reasons.append(f"Unrecognized category: {category}")
 
     if not form.gender:
         flagged_reasons.append("Unknown Gender")
 
+    for dpd_res in res.dependants:
+        is_spouse = getattr(dpd_res, "is_spouse", False)
+        if not is_spouse and dpd_res.dob:
+            try:
+                dpd_dob_parsed = parser.parse(dpd_res.dob, dayfirst=False)
+                today = datetime.utcnow()
+                dpd_age = today.year - dpd_dob_parsed.year - ((today.month, today.day) < (dpd_dob_parsed.month, dpd_dob_parsed.day))
+                if dpd_age > 18:
+                    flagged_reasons.append("child is older than minimum age req")
+                    break
+            except Exception:
+                pass
+
     if flagged_reasons:
         form.flagged = True
         form.reason = ";".join(flagged_reasons)
+    else:
+        form.flagged = False
+        form.reason = None
 
     form.department = res.department
     form.employment_id = res.employment_id
@@ -213,14 +241,24 @@ def normalize_form_object(
     form.cadre = res.cadre
     form.ext_aliment = res.existing_ailment
 
-    for idx, dpd_coords in enumerate(coords):
-        dpd_res = res.dependants[idx]
+    for idx, dpd_res in enumerate(res.dependants):
+        try:
+            dpd_coords = coords[idx]
+        except IndexError:
+            dpd_coords={
+                "x1": 0,
+                "y1": 0,
+                "x2": 0,
+                "y2": 0             
+            }
+
         dpd_record= Dependants(
-            uuid=uuid_tools.uuid4(),
+            uuid=str(uuid_tools.uuid4()),
             dpd_name=dpd_res.name,
             dpd_dob=dpd_res.dob,
             sequence=idx + 1,
             dpd_gender=dpd_res.gender,
+            is_spouse=getattr(dpd_res, "is_spouse", False),
             dpd_phone_number=dpd_res.phone_number,
             dpd_medical_history=dpd_res.existing_ailment,
             passport_xmin = dpd_coords["x1"],
