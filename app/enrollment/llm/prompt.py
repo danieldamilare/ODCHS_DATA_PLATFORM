@@ -8,6 +8,18 @@ SECTION 1: GENERAL RULES
 - If a field is empty, illegible, or not ticked, you MUST set its value to an empty string (""). Never omit keys.
 
 ═══════════════════════════════════════════
+EMPLOYMENT ID EXTRACTION:
+═══════════════════════════════════════════
+- Search the ENTIRE document image for the Employment ID.
+- Do NOT restrict the search to the field labeled "Employment ID".
+- The Employment ID may appear in the top/header section of the form, beside the form logo, in document metadata, or elsewhere on the page.
+- If an Employment ID is visible anywhere on the document, extract it.
+- If the "Employment ID" form field is empty but an Employment ID is printed elsewhere on the document, use the value found elsewhere.
+- The document header/top section takes priority over an empty or missing Employment ID form field.
+- Only return null/missing if you have searched the entire document and cannot find an Employment ID.
+- Preserve the Employment ID exactly as shown, including letters, numbers, hyphens, slashes, or leading zeros.
+
+═══════════════════════════════════════════
 SECTION 2: DATE FORMAT
 ═══════════════════════════════════════════
 - Dates of birth on these forms are not written in either format —

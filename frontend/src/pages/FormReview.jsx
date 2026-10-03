@@ -53,7 +53,7 @@ const PERSONAL_FIELDS = [
 ];
 
 const FORMAL_FIELDS = [
-    { key: "enployment_id", label: "Staff / Employment ID", grid: "col-span-1" },
+    { key: "employment_id", label: "Staff / Employment ID", grid: "col-span-1" },
     { key: "present_mda", label: "Present MDA / Ministry / Agency", grid: "col-span-1" },
     { key: "department", label: "Department", grid: "col-span-1" },
     { key: "cadre", label: "Cadre / Designation", grid: "col-span-1" },

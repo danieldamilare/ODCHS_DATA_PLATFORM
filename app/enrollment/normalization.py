@@ -236,7 +236,7 @@ def normalize_form_object(
         form.reason = None
 
     form.department = res.department
-    form.employment_id = res.employment_id
+    form.enployment_id = res.employment_id
     form.present_mda = res.present_mda
     form.cadre = res.cadre
     form.ext_aliment = res.existing_ailment
