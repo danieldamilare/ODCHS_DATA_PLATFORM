@@ -289,18 +289,25 @@ function UserRow({ user, isLastRow, onResend, onCancel, onDeactivate, onReactiva
                 </div>
             </td>
 
-            {/* Role */}
+            {/* Role & Scheme */}
             <td className="px-3 md:px-6 py-4">
-                <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        user.role === "admin"
-                            ? "bg-primary-50 text-primary-700 border border-primary-200/50"
-                            : "bg-slate-100 text-slate-600"
-                    }`}
-                >
-                    {user.role === "admin" ? <Shield size={11} /> : null}
-                    {user.role === "admin" ? "Admin" : "Staff"}
-                </span>
+                <div className="flex flex-col items-start gap-1">
+                    <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            user.role === "admin"
+                                ? "bg-primary-50 text-primary-700 border border-primary-200/50"
+                                : "bg-slate-100 text-slate-600"
+                        }`}
+                    >
+                        {user.role === "admin" ? <Shield size={11} /> : null}
+                        {user.role === "admin" ? "Admin" : "Staff"}
+                    </span>
+                    {user.scheme ? (
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {user.scheme}
+                        </span>
+                    ) : null}
+                </div>
             </td>
 
             {/* Status */}

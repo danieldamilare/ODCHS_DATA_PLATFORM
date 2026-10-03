@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from app.auth.models import UserRole
+from app.auth.models import UserRole, ODCHCScheme
 from typing import Optional
 from datetime import datetime
 
@@ -9,6 +9,7 @@ class UserValidator(BaseModel):
     email: EmailStr
     role: UserRole
     expiry_date: Optional[datetime] = None
+    scheme: ODCHCScheme
 
     @field_validator("email")
     @classmethod

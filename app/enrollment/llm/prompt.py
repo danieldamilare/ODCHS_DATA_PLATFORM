@@ -8,6 +8,18 @@ SECTION 1: GENERAL RULES
 - If a field is empty, illegible, or not ticked, you MUST set its value to an empty string (""). Never omit keys.
 
 ═══════════════════════════════════════════
+EMPLOYMENT ID EXTRACTION:
+═══════════════════════════════════════════
+- Search the ENTIRE document image for the Employment ID.
+- Do NOT restrict the search to the field labeled "Employment ID".
+- The Employment ID may appear in the top/header section of the form, beside the form logo, in document metadata, or elsewhere on the page.
+- If an Employment ID is visible anywhere on the document, extract it.
+- If the "Employment ID" form field is empty but an Employment ID is printed elsewhere on the document, use the value found elsewhere.
+- The document header/top section takes priority over an empty or missing Employment ID form field.
+- Only return null/missing if you have searched the entire document and cannot find an Employment ID.
+- Preserve the Employment ID exactly as shown, including letters, numbers, hyphens, slashes, or leading zeros.
+
+═══════════════════════════════════════════
 SECTION 2: DATE FORMAT
 ═══════════════════════════════════════════
 - Dates of birth on these forms are not written in either format —
@@ -35,4 +47,15 @@ SECTION 4: NAME TRANSLATION
 ═══════════════════════════════════════════
 - Name transcription: Nigerian given names and surnames are typically single unbroken words (e.g. "Akinyele", "Oluwaseun"). Do not insert a space in the middle of a name unless there is a clear, unambiguous gap in the handwriting. If a trailing letter is unclear, include it as part of the name rather than treating it as a separate initial.
  - Match schema to position in the form, (e.g surname text in form go to the surname in the schema )
+
+═══════════════════════════════════════════
+For dependant information:
+═══════════════════════════════════════════
+- Extract EVERY dependant row visible on the form.
+- Return each dependant as a separate object in the dependants array.
+- Do not merge multiple dependant rows into one object.
+- Preserve the order in which dependants appear on the form.
+- If there are no dependants or the dependant section is blank, return an empty array [].
+- For an individual dependant field that is blank or unreadable, return its default empty value.
+- Do not invent dependant information.
 """

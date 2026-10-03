@@ -18,7 +18,8 @@ class AdminServices:
             first_name = res.first_name.strip().capitalize(),
             last_name= res.last_name.strip().capitalize(),
             email = res.email,
-            role = res.role
+            role = res.role,
+            scheme = res.scheme
         )
 
 

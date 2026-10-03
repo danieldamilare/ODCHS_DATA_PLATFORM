@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Crosshair } from "lucide-react";
 
-export default function CropModal({ imgSrc, initialCoords, onApply, onClose }) {
+export default function CropModal({ imgSrc, initialCoords, onApply, onClose, title = "Crop Passport" }) {
     const canvasRef = useRef(null);
     const imgRef = useRef(null);
     const [imgLoaded, setImgLoaded] = useState(false);
@@ -157,7 +157,7 @@ export default function CropModal({ imgSrc, initialCoords, onApply, onClose }) {
                         <div className="gradient-primary rounded-lg p-2 text-white">
                             <Crosshair size={16} />
                         </div>
-                        <h2 className="font-bold text-slate-900">Crop Passport</h2>
+                        <h2 className="font-bold text-slate-900">{title}</h2>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
                         <X size={20} />

@@ -1,6 +1,8 @@
 import cv2
 import os
 
+from app.enrollment.models import ODCHCScheme
+
 
 YUNET_MODEL_PATH = os.path.join(
     os.path.dirname(__file__), "face_detection_yunet_2026may.onnx"
@@ -77,9 +79,7 @@ def generate_crop_dimension_from_face(face_area, scale_factor, margin, h_img, w_
     return {"x1": x1, "x2": x2, "y1": y1, "y2": y2}
 
 
-def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=None):
-    print("About to start reading image")
-
+def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=None, form_scheme: ODCHCScheme = None):
     img = read_image(img_path_or_matrix)
     original_image = img
     h_img, w_img = img.shape[:2]
@@ -92,15 +92,21 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
         img_approx.append(cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE))
     else:
         img_approx.append(img)
-        img_approx.append(cv2.rotate(img, cv2.ROTATE_180))
 
     detector = cv2.FaceDetectorYN.create(
         model=YUNET_MODEL_PATH,
         config="",
         input_size=(0, 0),
-        score_threshold=0.40,
+        score_threshold=0.35,
         nms_threshold=0.20,
     )
+
+    if form_scheme in (ODCHCScheme.SUNSHIS, ODCHCScheme.ORANGHIS, ODCHCScheme.ABIYAMO):
+        MAX_FACES = 6
+    else:
+        MAX_FACES = 1
+
+    POSITION_THRESHOLD = 0.60  # only applied for single-face schemes
 
     for img in img_approx:
 
@@ -109,28 +115,48 @@ def process_form_orientation_and_crop(img_path_or_matrix, margin=0.27, logger=No
         h_low, w_low = img_low_res.shape[:2]
         detector.setInputSize((w_low, h_low))
         h, w = img.shape[:2]
+
         try:
             _, faces = detector.detect(img_low_res)
 
             if faces is None or len(faces) == 0:
                 continue
-            face_area = faces[0]
-            result = generate_crop_dimension_from_face(
-                face_area, scale_factor, margin, h, w
-            )
-            if (result["y2"] + result["y1"]) / 2 < h * 0.45:
-                return img, result
+
+            faces_sorted = faces[faces[:, -1].argsort()[::-1]]
+            top_faces = faces_sorted[:MAX_FACES]
+
+            results = [
+                generate_crop_dimension_from_face(face_area, scale_factor, margin, h, w)
+                for face_area in top_faces
+            ]
+
+            # if logger:
+            #     logger.info(f"YuNet detected {len(faces)} face(s), kept top {len(results)} by confidence")
+
+            if MAX_FACES == 1:
+                result = results[0]
+                if (result["y2"] + result["y1"]) / 2 < h * POSITION_THRESHOLD:
+                    return img, result
+                if logger:
+                    logger.info(
+                        f"Rejected single face: center y={((result['y2']+result['y1'])/2):.0f} "
+                        f">= threshold {h * POSITION_THRESHOLD:.0f}"
+                    )
+            else:
+                # Multi-face schemes: no position filtering, since faces
+                # may legitimately be spread across the form.
+                if results:
+                    return img, results
+
         except Exception as e:
             if logger:
                 logger.info(f"Encounter error on image: {e}")
             continue
+
     if logger:
         logger.info(
-            "Error extracting passport: returning a negative coordinatine for error"
+            "Error extracting passport: returning a negative coordinate for error"
         )
-    return original_image, {
-        "x1": -1,
-        "x2": -1,
-        "y1": -1,
-        "y2": -1,
-    }  # Give up and return the first image (original if the image wasn't slanted in rotation)
+
+    default_fail = {"x1": -1, "x2": -1, "y1": -1, "y2": -1}
+    return original_image, default_fail if MAX_FACES == 1 else [default_fail]

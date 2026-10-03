@@ -14,8 +14,12 @@ export async function getWards(lgaId) {
     return request(`/wards/${lgaId}`);
 }
 
-export async function getFacilities(wardId) {
-    return request(`/facilities/${wardId}`);
+export async function getFacilities(targetId, scheme = "bhcpfp") {
+    return request(`/facilities/${targetId}?scheme=${scheme}`);
+}
+
+export async function getFacilitiesByLga(lgaId, scheme = "oranghis") {
+    return request(`/facilities/lga/${lgaId}?scheme=${scheme}`);
 }
 
 export async function getCategories() {
