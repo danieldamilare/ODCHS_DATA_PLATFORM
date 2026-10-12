@@ -76,12 +76,16 @@ class NINBatchValidator(BaseModel):
 
         try:
             header_value = read_dataset_header(self.batch_file)
+            if isinstance(header_value, tuple):
+                header_value = header_value[1]
+
             print("header_value", header_value)
         except Exception:
             raise ValueError("Error reading file.")
         if not header_value:
             raise ValueError("Error reading header from file")
         header_set = set(str(h).strip().lower() for h in header_value)
+        print(header_set)
 
         compulsory_set = {"dob", "nin"}
         option_set = {"dob", "nin", "lga"}
@@ -91,11 +95,13 @@ class NINBatchValidator(BaseModel):
                 f"Columns: {missing} are needed for nin validation submisson"
             )
 
-        if (self.generate_report
+        if (
+            self.generate_report
             or self.aggregate_by_lga_facility
-            or self.aggregate_by_lga_ward): 
+            or self.aggregate_by_lga_ward
+        ):
 
-            if (missing := option_set - header_set):
+            if missing := option_set - header_set:
                 raise ValueError(
                     f"Columns {list(missing)} is missing, and needed for validation and report generation"
                 )
@@ -103,7 +109,9 @@ class NINBatchValidator(BaseModel):
             if self.aggregate_by_lga_ward or self.aggregate_by_lga_facility:
                 needed = "ward" if self.aggregate_by_lga_ward else "facility"
                 if needed not in header_set:
-                    raise ValueError(f"Column [{needed}] is missing and is needed for your breakdown")
-
+                    raise ValueError(
+                        f"Column [{needed}] is missing and is needed for your breakdown"
+                    )
+        print("We've reached here")
         self.batch_file.stream.seek(0)
         return self

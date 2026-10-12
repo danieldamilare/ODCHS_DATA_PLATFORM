@@ -29,14 +29,45 @@ def read_dataset_header(file: FileStorage) -> List[Any]:
     file.stream.seek(0)
 
     if ext == ".csv":
-        reader = _get_csv_reader(file)
-        try:
-            return next(reader)
-        except StopIteration:
+        # Read the first line as text without letting TextIOWrapper close the underlying buffer
+        line = file.stream.readline()
+        if not line:
             return []
+        if isinstance(line, bytes):
+            line = line.decode("utf-8-sig", errors="replace")
+
+        # Parse that single line with csv.reader
+        row = next(csv.reader([line]), [])
+        return row
 
     elif ext in (".xls", ".xlsx"):
         workbook = CalamineWorkbook.from_filelike(file.stream)
         sheet = workbook.get_sheet_by_index(0)
-        return next(sheet.iter_rows())
+        try:
+            return next(sheet.iter_rows())
+        except StopIteration:
+            return []
+
     return []
+
+
+#
+# def read_dataset_header(file: FileStorage) -> List[Any]:
+#     ext = get_dataset_type(file)
+#     if not ext:
+#         return []
+#
+#     file.stream.seek(0)
+#
+#     if ext == ".csv":
+#         reader = _get_csv_reader(file)
+#         try:
+#             return next(reader)
+#         except StopIteration:
+#             return []
+#
+#     elif ext in (".xls", ".xlsx"):
+#         workbook = CalamineWorkbook.from_filelike(file.stream)
+#         sheet = workbook.get_sheet_by_index(0)
+#         return next(sheet.iter_rows())
+#     return []

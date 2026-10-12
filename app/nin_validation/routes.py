@@ -154,6 +154,7 @@ def validate_nin_batch():
         }
         res = NINBatchValidator.model_validate(res)
     except ValidationError as e:
+        print("Error has happened")
         return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
     except KeyError:
         return jsonify({"success": False, "msg": "batch_file is required"}), 400
