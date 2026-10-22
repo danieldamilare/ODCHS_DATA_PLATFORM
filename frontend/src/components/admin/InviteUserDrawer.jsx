@@ -3,11 +3,19 @@ import { createUser } from "../../api/admin";
 import { X, Mail, User, Shield, Calendar, Infinity as InfinityIcon, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "../ui/Toast";
 
+const SCHEMES = [
+    { id: "bhcpfp", label: "BHCPF", description: "Basic Health Care Fund" },
+    { id: "oranghis", label: "ORANGHIS", description: "State Health Insurance" },
+    { id: "abiyamo", label: "ABIYAMO", description: "Maternal & Child Scheme" },
+    { id: "sunshis", label: "SUNSHIS", description: "Sunshine Health Scheme" },
+];
+
 export default function InviteUserDrawer({ isOpen, onClose, onUserCreated }) {
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
     const [role, setRole] = useState("user");
+    const [scheme, setScheme] = useState("bhcpfp");
     const [expiryType, setExpiryType] = useState("never"); // "never" | "date"
     const [expiryDate, setExpiryDate] = useState("");
     const [loading, setLoading] = useState(false);
@@ -29,6 +37,7 @@ export default function InviteUserDrawer({ isOpen, onClose, onUserCreated }) {
             last_name: lastName.trim(),
             email: email.trim().toLowerCase(),
             role,
+            scheme,
             expiry_date: expiryType === "date" && expiryDate ? new Date(expiryDate).toISOString() : null,
         };
 
@@ -41,6 +50,7 @@ export default function InviteUserDrawer({ isOpen, onClose, onUserCreated }) {
                 setLastName("");
                 setEmail("");
                 setRole("user");
+                setScheme("bhcpfp");
                 setExpiryType("never");
                 setExpiryDate("");
                 onUserCreated?.();
@@ -165,6 +175,29 @@ export default function InviteUserDrawer({ isOpen, onClose, onUserCreated }) {
                                     <Shield size={14} />
                                     Administrator
                                 </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Assigned Scheme <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {SCHEMES.map((s) => (
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => setScheme(s.id)}
+                                        className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                            scheme === s.id
+                                                ? "border-primary-500 bg-primary-50/40 text-primary-700 font-semibold shadow-xs"
+                                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span className="text-xs font-bold uppercase">{s.label}</span>
+                                        <span className="text-[10px] text-slate-400 font-normal mt-0.5 leading-tight">{s.description}</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
 

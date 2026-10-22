@@ -83,6 +83,7 @@ def extract_zip_for_processing(path: str, batch_id: str):
                     batch_id=batch.id,
                     sequence=idx + 1,
                     status=FormStatus.PENDING,
+                    scheme=batch.scheme
                 )
                 print("Created new form: ", new_form)
                 db.session.add(new_form)
@@ -162,10 +163,11 @@ def _process_image_pipeline(form: Form, batch: Batch):
     print(f"blur: {perf_counter() - t0:.3f}s")
 
     t0 = perf_counter()
-    correct_form, coords = process_form_orientation_and_crop(image_matrix)
+    correct_form, coords = process_form_orientation_and_crop(image_matrix, form_scheme=form.scheme)
     print(f"yunet crop and orientation correction: {perf_counter() - t0:.3f}s")
 
-    desc, path = tempfile.mkstemp(suffix=".webp")
+    os.makedirs("./.tmp", exist_ok=True)
+    desc, path = tempfile.mkstemp(suffix=".webp", dir="./.tmp")
     os.close(desc)
     cv2.imwrite(path, correct_form, [cv2.IMWRITE_WEBP_QUALITY, 90])
     

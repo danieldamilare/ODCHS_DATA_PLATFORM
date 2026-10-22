@@ -1,9 +1,33 @@
 import { useState, useEffect } from "react";
-import { Upload, CloudUpload, MapPin, Building } from "lucide-react";
+import { Upload, CloudUpload, MapPin, Building, CheckCircle2 } from "lucide-react";
 import { uploadBatch, getLGAs, getWards, getFacilities } from "../../api/enrollment";
+import { useAuth } from "../../context/AuthContext";
+
+const ADMIN_SCHEMES = [
+    {
+        id: "bhcpfp",
+        name: "BHCPF",
+        tag: "Primary Care",
+        desc: "Basic Health Care Provision Fund for vulnerable groups",
+    },
+    {
+        id: "oranghis",
+        name: "ORANGHIS",
+        tag: "Formal Sector",
+        desc: "State Health Insurance for civil & public servants + dependants",
+    },
+    {
+        id: "sunshis",
+        name: "SUNSHIS",
+        tag: "Sunshine Health",
+        desc: "Informal sector & community health plans + dependants",
+    },
+];
 
 export default function UploadCard({ onBatchCreated }) {
+    const { user, isAdmin } = useAuth();
     const [file, setFile] = useState(null);
+    const [selectedScheme, setSelectedScheme] = useState("bhcpfp");
     const [lgas, setLgas] = useState([]);
     const [wards, setWards] = useState([]);
     const [facilities, setFacilities] = useState([]);
@@ -19,6 +43,9 @@ export default function UploadCard({ onBatchCreated }) {
     const [batchName, setBatchName] = useState("");
     const [leaveLocationBlank, setLeaveLocationBlank] = useState(false);
 
+    const effectiveScheme = isAdmin ? (selectedScheme || "bhcpfp") : (user?.scheme || "bhcpfp");
+    const isBhcpf = effectiveScheme.toLowerCase() === "bhcpfp";
+
     useEffect(() => {
         getLGAs()
             .then(res => setLgas(res.data ?? res))
@@ -31,24 +58,38 @@ export default function UploadCard({ onBatchCreated }) {
         setWards([]);
         setFacilities([]);
         if (!lgaId) return;
-        getWards(lgaId)
-            .then(res => setWards(res.data ?? res))
-            .catch(() => setError("Couldn't load wards"));
-    }, [lgaId]);
+        if (isBhcpf) {
+            getWards(lgaId)
+                .then(res => setWards(res.data ?? res))
+                .catch(() => setError("Couldn't load wards"));
+        } else {
+            getFacilities(lgaId, effectiveScheme)
+                .then(res => setFacilities(res.data ?? res))
+                .catch(() => setError("Couldn't load facilities"));
+        }
+    }, [lgaId, isBhcpf, effectiveScheme]);
 
     useEffect(() => {
+        if (!isBhcpf) return;
         setFacilityId("");
         setFacilities([]);
         if (!wardId) return;
-        getFacilities(wardId)
+        getFacilities(wardId, "bhcpfp")
             .then(res => setFacilities(res.data ?? res))
             .catch(() => setError("Couldn't load facilities"));
-    }, [wardId]);
+    }, [wardId, isBhcpf]);
 
     async function handleSubmit(e) {
         e.preventDefault();
         if (!file) return setError("Select a zip file");
-        if (!leaveLocationBlank && (!lgaId || !wardId || !facilityId)) return setError("Select LGA, ward, and facility");
+        if (!leaveLocationBlank) {
+            if (isBhcpf && (!lgaId || !wardId || !facilityId)) {
+                return setError("Select LGA, ward, and facility");
+            }
+            if (!isBhcpf && (!lgaId || !facilityId)) {
+                return setError("Select LGA and facility");
+            }
+        }
 
         setUploading(true);
         setUploadProgress(0);
@@ -58,6 +99,11 @@ export default function UploadCard({ onBatchCreated }) {
         formData.append("batch_file", file);
         if (batchName.trim()) formData.append("name", batchName.trim());
         
+        // When admin uploads, send the chosen scheme; otherwise leave empty so user's assigned scheme applies
+        if (isAdmin && selectedScheme) {
+            formData.append("scheme", selectedScheme);
+        }
+
         if (!leaveLocationBlank) {
             formData.append("lga_no", lgaId);
             formData.append("ward_no", wardId);
@@ -91,6 +137,51 @@ export default function UploadCard({ onBatchCreated }) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 mt-5">
+                {/* ── Admin Scheme Selector ── */}
+                {isAdmin && (
+                    <div className="pt-1">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-xs font-semibold text-slate-700">
+                                Target Scheme <span className="text-primary-600 font-normal">(Admin Selection)</span>
+                            </label>
+                            <span className="text-[11px] text-slate-400 font-medium">
+                                Choose scheme for this batch
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {ADMIN_SCHEMES.map((s) => {
+                                const isSelected = selectedScheme === s.id;
+                                return (
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => setSelectedScheme(s.id)}
+                                        className={`relative p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                                            isSelected
+                                                ? "border-primary-500 bg-primary-50/50 shadow-sm ring-2 ring-primary-500/20"
+                                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                            <span className="font-bold text-xs text-slate-900 tracking-wide">
+                                                {s.name}
+                                            </span>
+                                            {isSelected ? (
+                                                <CheckCircle2 size={16} className="text-primary-600 shrink-0" />
+                                            ) : (
+                                                <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
+                                            {s.desc}
+                                        </p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">
                         Batch Name (Optional)
@@ -120,7 +211,7 @@ export default function UploadCard({ onBatchCreated }) {
                         <span>This batch spans multiple locations (leave location blank)</span>
                     </label>
                     
-                    <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity ${leaveLocationBlank ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <div className={`grid grid-cols-1 ${isBhcpf ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 transition-opacity ${leaveLocationBlank ? 'opacity-40 pointer-events-none' : ''}`}>
                         <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">
                                 <MapPin size={10} className="inline mr-1" />LGA
@@ -130,18 +221,20 @@ export default function UploadCard({ onBatchCreated }) {
                                 {lgas.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1.5">Ward</label>
-                            <select value={wardId} onChange={(e) => setWardId(e.target.value)} disabled={leaveLocationBlank || !lgaId} className={selectClass}>
-                                <option value="">Select Ward</option>
-                                {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                            </select>
-                        </div>
+                        {isBhcpf && (
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1.5">Ward</label>
+                                <select value={wardId} onChange={(e) => setWardId(e.target.value)} disabled={leaveLocationBlank || !lgaId} className={selectClass}>
+                                    <option value="">Select Ward</option>
+                                    {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                </select>
+                            </div>
+                        )}
                         <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">
                                 <Building size={10} className="inline mr-1" />Facility
                             </label>
-                            <select value={facilityId} onChange={(e) => setFacilityId(e.target.value)} disabled={leaveLocationBlank || !wardId} className={selectClass}>
+                            <select value={facilityId} onChange={(e) => setFacilityId(e.target.value)} disabled={leaveLocationBlank || (isBhcpf ? !wardId : !lgaId)} className={selectClass}>
                                 <option value="">Select Facility</option>
                                 {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                             </select>

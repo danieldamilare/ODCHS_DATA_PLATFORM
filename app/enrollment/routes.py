@@ -11,6 +11,8 @@ from flask import (
 from app.enrollment.models import BatchStatus, Batch, Form, FormStatus
 from app import db
 import sqlalchemy as sa
+
+from app.auth.utils import login_required, get_current_user
 from app.enrollment.schema import BatchUploader, FormPassPortUploader, FormUpdater
 from app.enrollment.keys import EnrollmentIdCardKeys, EnrollmentKeys
 from app.enrollment.services import (
@@ -34,6 +36,7 @@ import os
 
 
 @enrollment_bp.route("/batches")
+@login_required
 def batch_get():
     page = int(request.args.get("page", 1))
     count = int(request.args.get("count", current_app.config["DEFAULT_PAGINATION"]))
@@ -59,6 +62,7 @@ def batch_get():
 
 
 @enrollment_bp.post("/batches")
+@login_required
 def batch_post():
     try:
         uploader = BatchUploader(
@@ -67,16 +71,19 @@ def batch_post():
             lga_no=parse_opt_int(request.form.get("lga_no")),
             ward_no=parse_opt_int(request.form.get("ward_no")),
             facility_no=parse_opt_int(request.form.get("facility_no")),
+            scheme=request.form.get("scheme") or None
         )
     except ValidationError as e:
         return jsonify({"success": False, "msg": serialize_validation_errors(e)}), 400
 
+    current_user = get_current_user()
     result: BatchJobResult = BatchServices().create_job(
         lga_no=uploader.lga_no,
         ward_no=uploader.ward_no,
         facility_no=uploader.facility_no,
         file=uploader.batch_file,
         name=uploader.name,
+        scheme=uploader.scheme if uploader.scheme else current_user.scheme
     )
 
     if result.status == "duplicate":
@@ -114,6 +121,7 @@ def batch_post():
 
 
 @enrollment_bp.get("/batches/<string:batch_id>")
+@login_required
 def get_batch_id(batch_id: str):
     batch_service = BatchServices()
     data = batch_service.get_breakdown_stat(batch_id)
@@ -126,6 +134,7 @@ def get_batch_id(batch_id: str):
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/forms/download")
+@login_required
 def download_batch_forms(batch_id: str):
     batch_service = BatchServices()
     status_filter = request.args.get("status", None)
@@ -142,6 +151,7 @@ def download_batch_forms(batch_id: str):
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/forms")
+@login_required
 def get_batch_forms(batch_id: str):
     batch_service = BatchServices()
     batch = batch_service.get(batch_id)
@@ -201,6 +211,7 @@ def get_batch_forms(batch_id: str):
     )
 
 @enrollment_bp.get("/batches/<string:batch_id>/progress")
+@login_required
 def get_batch_progress_stream(batch_id: str):
     batch_service = BatchServices()
     batch = batch_service.get(batch_id)
@@ -306,6 +317,7 @@ def get_batch_progress_stream(batch_id: str):
 
 
 @enrollment_bp.post("/batches/<string:batch_id>/idcards")
+@login_required
 def start_id_card_generation(batch_id: str):
     batch_service = BatchServices()
     result: BatchIdCardJobResult = batch_service.start_id_card_generation(batch_id)
@@ -330,6 +342,7 @@ def start_id_card_generation(batch_id: str):
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/idcards/progress")
+@login_required
 def get_idcard_progress_stream(batch_id: str):
     batch_service = BatchServices()
     batch = batch_service.get(batch_id)
@@ -411,6 +424,7 @@ def get_idcard_progress_stream(batch_id: str):
 
 
 @enrollment_bp.get("/batches/<string:batch_id>/idcards/download")
+@login_required
 def download_idcards(batch_id: str):
     batch_service = BatchServices()
     result: BatchIdCardDownloadResult = batch_service.id_card_download(batch_id)
@@ -448,11 +462,13 @@ def _serve_form_file(asset_id: str, as_attachment: bool = False):
 
 
 @enrollment_bp.get("/asset/form/<string:asset_id>")
+@login_required
 def get_form_asset(asset_id: str):
     return _serve_form_file(asset_id=asset_id, as_attachment=False)
 
 
 @enrollment_bp.get("/asset/passport/<string:asset_id>")
+@login_required
 def get_passport_asset(asset_id: str):
     form_service = FormServices()
     form = form_service.get(asset_id)
@@ -465,7 +481,22 @@ def get_passport_asset(asset_id: str):
     )
 
 
+@enrollment_bp.get("/asset/passport/dependant/<string:dpd_id>")
+@login_required
+def get_dependant_passport_asset(dpd_id: str):
+    from app.enrollment.models import Dependants
+    dpd = db.session.scalar(sa.select(Dependants).where(Dependants.uuid == dpd_id))
+    if not dpd or not dpd.passport_path or not dpd.form:
+        return (jsonify({"success": False, "msg": "Asset cannot be found"}), 404)
+    return send_from_directory(
+        os.path.join(current_app.config["PASSPORT_PATH"], dpd.form.batch.uuid),
+        os.path.basename(dpd.passport_path),
+        max_age=86400,
+    )
+
+
 @enrollment_bp.get("/form/<string:form_id>")
+@login_required
 def get_form(form_id: str):
     form_service = FormServices()
     form = form_service.get(form_id)
@@ -491,6 +522,7 @@ def get_form(form_id: str):
 
 
 @enrollment_bp.post("/form/<string:form_id>/passport")
+@login_required
 def update_form_passport(form_id: str):
     form_service = FormServices()
     form = form_service.get(form_id)
@@ -517,6 +549,7 @@ def update_form_passport(form_id: str):
 
 
 @enrollment_bp.patch("/form/<string:form_id>")
+@login_required
 def update_form(form_id: str):
     try:
         updater = FormUpdater(**request.get_json(silent=True) or {})
@@ -541,6 +574,7 @@ def update_form(form_id: str):
 
 
 @enrollment_bp.post("/form/<string:form_id>/rescan")
+@login_required
 def rescan_form(form_id: str):
     form_service = FormServices()
     form = form_service.get(form_id)
@@ -572,6 +606,7 @@ def rescan_form(form_id: str):
 
 
 @enrollment_bp.post("/form/<string:form_id>/reject")
+@login_required
 def reject_form(form_id: str):
     form_service = FormServices()
     form = form_service.get(form_id)
@@ -598,6 +633,7 @@ def reject_form(form_id: str):
 
 
 @enrollment_bp.post("/form/<string:form_id>/enroll")
+@login_required
 def enroll_form(form_id: str):
     form_service = FormServices()
     result = form_service.enroll(form_id)
@@ -625,6 +661,7 @@ def enroll_form(form_id: str):
 
 
 @enrollment_bp.post("/form/<string:form_id>/reprocess")
+@login_required
 def reprocess_form(form_id: str):
     form_service = FormServices()
     form = form_service.get(form_id)
@@ -652,6 +689,7 @@ def reprocess_form(form_id: str):
 
 
 @enrollment_bp.get("/form/<string:form_id>/download")
+@login_required
 def download_form_idcard(form_id: str):
     type = request.args.get("type", None)
     form_service = FormServices()
@@ -679,6 +717,7 @@ CACHE_1_YEAR = 60 * 60 * 24 * 365
 CACHE_90_DAYS = 60 * 60 * 24 * 90
 
 @enrollment_bp.get("/lgas")
+@login_required
 def get_lgas():
     loader = get_loader()
     lga = loader.lgas or {}
@@ -686,20 +725,37 @@ def get_lgas():
 
 
 @enrollment_bp.route("/wards/<int:lga_id>")
+@login_required
 def get_wards(lga_id):
     loader = get_loader()
     wards = loader.wards.get(str(lga_id), {})
     return jsonify([{"id": code, "name": name} for name, code in wards.items()]), 200, {"Cache-Control":  f"public, max-age={CACHE_1_YEAR}"}
 
 
-@enrollment_bp.route("/facilities/<int:ward_id>")
-def get_facilities(ward_id):
+@enrollment_bp.route("/facilities/<int:target_id>")
+@login_required
+def get_facilities(target_id):
     loader = get_loader()
-    facilities = loader.facilities.get(str(ward_id), {})
+    scheme_param = request.args.get("scheme", "bhcpfp")
+    plan_id = loader.get_plan_id(scheme_param)
+    facs_map = loader.get_facilities(plan_id)
+    facilities = facs_map.get(str(target_id), {})
+    return jsonify([{"id": code, "name": name} for name, code in facilities.items()]), {"Cache-Control":  f"public, max-age={CACHE_90_DAYS}"}
+
+
+@enrollment_bp.route("/facilities/lga/<int:lga_id>")
+@login_required
+def get_facilities_by_lga(lga_id):
+    loader = get_loader()
+    scheme_param = request.args.get("scheme", "oranghis")
+    plan_id = loader.get_plan_id(scheme_param)
+    facs_map = loader.get_facilities(plan_id)
+    facilities = facs_map.get(str(lga_id), {})
     return jsonify([{"id": code, "name": name} for name, code in facilities.items()]), {"Cache-Control":  f"public, max-age={CACHE_90_DAYS}"}
  
 
 @enrollment_bp.route("/categories")
+@login_required
 def get_categories():
     loader = get_loader()
     citizen_types = loader.citizen_types or {}

@@ -63,6 +63,16 @@ def _is_retryable(exc: BaseException) -> bool:
     return _is_transient(exc) or _is_rate_limited(exc)
 
 
+def _get_gemini_keys() -> list[str]:
+    """Retrieve and sanitize comma-separated API keys from config/env."""
+    raw_keys = ""
+    try:
+        raw_keys = current_app.config.get("GEMINI_API_KEY", "")
+    except RuntimeError:
+        raw_keys = os.getenv("GEMINI_API_KEY", "")
+    keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
+    return keys if keys else [""]
+
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=2, max=30),
@@ -75,13 +85,13 @@ def _is_retryable(exc: BaseException) -> bool:
     before_sleep=before_sleep_log(logger, logging.WARNING),
     reraise=True,
 )
-def _call_gemini(image_path: str) -> OCRResponse:
+def _call_gemini(image_path: str, gemini_key) -> OCRResponse:
     if kv.get(GEMINI_CIRCUIT):
         raise ServerConnectionError("Server is currently down. Gently waiting")
 
     client = genai.Client(
-        api_key=current_app.config["GEMINI_API_KEY"],
-        http_options=types.HttpOptions(timeout=60000),
+        api_key=gemini_key,
+        http_options=types.HttpOptions(timeout=120000),
     )
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
@@ -112,20 +122,34 @@ def _call_gemini(image_path: str) -> OCRResponse:
 def gemini_client(image_path: str) -> OCRResponse:
     if kv.get(GEMINI_CIRCUIT):
         raise ServerConnectionError("Server is currently down. Gently waiting")
-    try:
-        return _call_gemini(image_path)
-    except Exception as e:
-        err_text = str(e).lower()
+    
+    keys = _get_gemini_keys()
+    last_exception = None
+    for idx, gemini_key in enumerate(keys,1):
+        try:
+            print(f"Attempting Gemini extraction using key {idx}/{len(keys)} (model: {MODEL_NAME})")
+            return _call_gemini(image_path, gemini_key)
+        except Exception as e:
+            last_exception = e
+            err_text = str(e).lower()
 
-        if any(
-            s in err_text
-            for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection")
-        ):
-            kv.setex(GEMINI_CIRCUIT, CIRCUIT_BREAKER_SECONDS, "Server error")
-            raise ServerConnectionError(f"Gemini server is unstable: {e}") from e
+            if any(
+                s in err_text
+                for s in ("ssl", "eof", "503", "unavailable", "timeout", "connection", "server")
+            ):
+                kv.setex(GEMINI_CIRCUIT, CIRCUIT_BREAKER_SECONDS, "Server error")
+                raise ServerConnectionError(f"Gemini server is unstable: {e}") from e
 
-        if "429" in err_text or "quota" in err_text or "rate limit" in err_text:
-            raise RateLimitExceeded(f"Rate limited after retries: {e}") from e
+            print("Gemini extraction failed: ", e, traceback.format_exc())
+            print(
+                f"Key {idx}/{len(keys)} ({MODEL_NAME}) exhausted all 5 retries: {e}. "
+                f"{'Switching to next key...' if idx < len(keys) else 'No more keys left.'}"
+            )
 
-        print("Gemini extraction failed: ", e, traceback.format_exc())
-        raise LLMExtractionFailed(f"Max retries exceeded: {e}") from e
+    # All keys exhausted their retries
+    err_text = str(last_exception).lower()
+    if "429" in err_text or "quota" in err_text or "rate limit" in err_text:
+        raise RateLimitExceeded(f"All Gemini API keys rate-limited after retries: {last_exception}") from last_exception
+
+    print("Gemini extraction failed across all keys: ", last_exception, traceback.format_exc())
+    raise LLMExtractionFailed(f"All API keys exhausted retries: {last_exception}") from last_exception
